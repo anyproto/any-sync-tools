@@ -4,13 +4,8 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
-)
-
-var (
-	nodeMapFile string
+	"os"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -18,13 +13,8 @@ var rootCmd = &cobra.Command{
 	Use:   "anyconf",
 	Short: "Tool to generate and manage configs",
 	Long:  ``,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -33,5 +23,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&nodeMapFile, "m", "nodemap.yml", "path to nodemap.yml file")
+	rootCmd.AddCommand(addNode)
+	rootCmd.AddCommand(reconfigure)
 }
