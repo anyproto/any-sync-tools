@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/anytypeio/any-sync-tools/anyconf/gen"
+	"github.com/anytypeio/any-sync-tools/gen"
 	"github.com/anytypeio/any-sync/accountservice"
 	"github.com/anytypeio/any-sync/nodeconf"
 	"github.com/spf13/cobra"

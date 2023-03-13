@@ -64,10 +64,10 @@ func GenNodeConfig(addresses []string, types []nodeconf.NodeType) (nodeconf.Node
 	return nodeconfig, accountConfig, nil
 }
 
-func GenerateConfig(address, dbPath string, grpcPort, debugPort int) (cfg clconfig.Config, err error) {
+func GenerateClientConfig(nodesConfigPath, address string, grpcPort, debugPort int) (cfg clconfig.Config, err error) {
 	nodesConfig := clconfig.Config{}
 
-	data, err := ioutil.ReadFile(dbPath)
+	data, err := ioutil.ReadFile(nodesConfigPath)
 	if err != nil {
 		return
 	}
