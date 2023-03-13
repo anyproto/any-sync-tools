@@ -2,12 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/anytypeio/any-sync-tools/anyconf/gen"
 	"github.com/anytypeio/any-sync/accountservice"
 	"github.com/anytypeio/any-sync/nodeconf"
-	"github.com/anytypeio/any-sync/util/keys"
-	"github.com/anytypeio/any-sync/util/keys/asymmetric/encryptionkey"
-	"github.com/anytypeio/any-sync/util/keys/asymmetric/signingkey"
-	"github.com/anytypeio/any-sync/util/peer"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
@@ -82,7 +79,7 @@ var addNode = &cobra.Command{
 			addresses = append(addresses, address)
 		}
 
-		newConf, accountConf, err := genNodeConfig(addresses, nodeTypes)
+		newConf, accountConf, err := gen.GenNodeConfig(addresses, nodeTypes)
 		nodesConfig.Nodes = append(nodesConfig.Nodes, newConf)
 
 		bytes, err := yaml.Marshal(nodesConfig)
@@ -123,51 +120,4 @@ func init() {
 	addNode.Flags().String(addressFlag, "", "Address to node [optional]")
 
 	addNode.Flags().String(outputAccountPathFlag, "account.yml", "Path to output account + nodes yaml")
-}
-
-func genNodeConfig(addresses []string, types []nodeconf.NodeType) (nodeconf.NodeConfig, accountservice.Config, error) {
-	encKey, _, err := encryptionkey.GenerateRandomRSAKeyPair(2048)
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
-	}
-
-	signKey, _, err := signingkey.GenerateRandomEd25519KeyPair()
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
-	}
-
-	encPubKey := encKey.GetPublic()
-	encPubKeyString, err := keys.EncodeKeyToString(encPubKey)
-
-	encEncKey, err := keys.EncodeKeyToString(encKey) // private key
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
-	}
-
-	encSignKey, err := keys.EncodeKeyToString(signKey) //encSignKey
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
-	}
-
-	peerID, err := peer.IdFromSigningPubKey(signKey.GetPublic())
-
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
-	}
-
-	nodeconfig := nodeconf.NodeConfig{
-		PeerId:        peerID.String(),
-		Addresses:     addresses,
-		EncryptionKey: encPubKeyString,
-		Types:         types,
-	}
-
-	accountConfig := accountservice.Config{
-		PeerId:        peerID.String(),
-		PeerKey:       encSignKey,
-		SigningKey:    encSignKey,
-		EncryptionKey: encEncKey,
-	}
-
-	return nodeconfig, accountConfig, nil
 }
