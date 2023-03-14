@@ -3,12 +3,13 @@ module github.com/anytypeio/any-sync-tools/gen
 go 1.19
 
 require (
-	github.com/anytypeio/any-sync v0.0.15-0.20230223135510-c708fbd98480
+	github.com/anytypeio/any-sync v0.0.20
 	github.com/anytypeio/go-anytype-infrastructure-experiments/client v0.0.0-20230131161746-a45996fe3f02
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	github.com/anytypeio/any-sync-node v0.0.21
 	github.com/anytypeio/go-chash v0.0.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -67,8 +68,8 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/image v0.0.0-20200119044424-58c23975cae1 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 	storj.io/drpc v0.0.32 // indirect

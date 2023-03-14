@@ -2,9 +2,14 @@ package gen
 
 import (
 	"fmt"
+	"github.com/anytypeio/any-sync-node/config"
+	"github.com/anytypeio/any-sync-node/nodestorage"
+	"github.com/anytypeio/any-sync-node/nodesync"
 	"github.com/anytypeio/any-sync/accountservice"
 	commonaccount "github.com/anytypeio/any-sync/accountservice"
+	"github.com/anytypeio/any-sync/app/logger"
 	"github.com/anytypeio/any-sync/commonspace"
+	"github.com/anytypeio/any-sync/metric"
 	"github.com/anytypeio/any-sync/net"
 	"github.com/anytypeio/any-sync/nodeconf"
 	"github.com/anytypeio/any-sync/util/keys"
@@ -64,6 +69,83 @@ func GenNodeConfig(addresses []string, types []nodeconf.NodeType) (nodeconf.Node
 	return nodeconfig, accountConfig, nil
 }
 
+func GenerateNodesConfigs(types []nodeconf.NodeType, addresses []string) (nodesConf []nodeconf.NodeConfig, accounts []accountservice.Config, err error) {
+	for index, nodeType := range types {
+		var addr []string
+		if len(addresses) > index {
+			addr = append(addr, addresses[index])
+		}
+		commonConfig, accountConfig, err := GenNodeConfig(addr, []nodeconf.NodeType{nodeType})
+
+		if err != nil {
+			panic(err)
+		}
+
+		nodesConf = append(nodesConf, commonConfig)
+		accounts = append(accounts, accountConfig)
+	}
+
+	return
+}
+
+func GenerateFullNodesConfigs(types []nodeconf.NodeType, addresses []string, debugAddresses []string) (conf config.Config, err error) {
+	nodesConf, accounts, err := GenerateNodesConfigs(types, addresses)
+
+	if err != nil {
+		panic(err)
+	}
+
+	var fullNodesConfig []config.Config
+
+	stream := net.StreamConfig{
+		TimeoutMilliseconds: 1000,
+		MaxMsgSizeMb:        256,
+	}
+
+	for index, account := range accounts {
+		nodeConf := nodesConf[index]
+
+		var debugAddr []string
+
+		if len(debugAddresses) > index {
+			debugAddr = append(debugAddr, debugAddresses[index])
+		}
+
+		config := config.Config{
+			GrpcServer: net.Config{
+				Server: net.ServerConfig{ListenAddrs: nodeConf.Addresses},
+				Stream: stream,
+			},
+			Account: account,
+			APIServer: net.Config{
+				Server: net.ServerConfig{ListenAddrs: debugAddr},
+				Stream: stream,
+			},
+			Nodes: nodesConf,
+			Space: commonspace.Config{
+				GCTTL:      60,
+				SyncPeriod: 20,
+			},
+			Storage: nodestorage.Config{Path: "data"},
+			Metric:  metric.Config{""},
+			Log: logger.Config{
+				Production:   false,
+				DefaultLevel: "",
+				NamedLevels:  make(map[string]string),
+			},
+			NodeSync: nodesync.Config{
+				SyncOnStart:       false,
+				PeriodicSyncHours: 0,
+			},
+		}
+
+		fullNodesConfig = append(fullNodesConfig, config)
+	}
+
+	return
+}
+
+// Temporary here
 func GenerateClientConfig(nodesConfigPath, address string, grpcPort, debugPort int) (cfg clconfig.Config, err error) {
 	nodesConfig := clconfig.Config{}
 

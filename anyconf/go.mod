@@ -3,7 +3,7 @@ module github.com/anytypeio/any-sync-tools/anyconf
 go 1.19
 
 require (
-	github.com/anytypeio/any-sync v0.0.15-0.20230223135510-c708fbd98480
+	github.com/anytypeio/any-sync v0.0.20
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3
 	gopkg.in/yaml.v3 v3.0.1
