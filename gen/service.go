@@ -22,6 +22,11 @@ import (
 	"io/ioutil"
 )
 
+type NodeParameters struct {
+	DebugAddress, Address string
+	NodeType              nodeconf.NodeType
+}
+
 func GenNodeConfig(addresses []string, types []nodeconf.NodeType) (nodeconf.NodeConfig, accountservice.Config, error) {
 	encKey, _, err := encryptionkey.GenerateRandomRSAKeyPair(2048)
 	if err != nil {
@@ -69,13 +74,9 @@ func GenNodeConfig(addresses []string, types []nodeconf.NodeType) (nodeconf.Node
 	return nodeconfig, accountConfig, nil
 }
 
-func GenerateNodesConfigs(types []nodeconf.NodeType, addresses []string) (nodesConf []nodeconf.NodeConfig, accounts []accountservice.Config, err error) {
-	for index, nodeType := range types {
-		var addr []string
-		if len(addresses) > index {
-			addr = append(addr, addresses[index])
-		}
-		commonConfig, accountConfig, err := GenNodeConfig(addr, []nodeconf.NodeType{nodeType})
+func GenerateNodesConfigs(nodes []NodeParameters) (nodesConf []nodeconf.NodeConfig, accounts []accountservice.Config, err error) {
+	for _, node := range nodes {
+		commonConfig, accountConfig, err := GenNodeConfig([]string{node.Address}, []nodeconf.NodeType{node.NodeType})
 
 		if err != nil {
 			panic(err)
@@ -88,14 +89,12 @@ func GenerateNodesConfigs(types []nodeconf.NodeType, addresses []string) (nodesC
 	return
 }
 
-func GenerateFullNodesConfigs(types []nodeconf.NodeType, addresses []string, debugAddresses []string) (conf config.Config, err error) {
-	nodesConf, accounts, err := GenerateNodesConfigs(types, addresses)
+func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []config.Config, err error) {
+	nodesConf, accounts, err := GenerateNodesConfigs(nodes)
 
 	if err != nil {
 		panic(err)
 	}
-
-	var fullNodesConfig []config.Config
 
 	stream := net.StreamConfig{
 		TimeoutMilliseconds: 1000,
@@ -104,12 +103,7 @@ func GenerateFullNodesConfigs(types []nodeconf.NodeType, addresses []string, deb
 
 	for index, account := range accounts {
 		nodeConf := nodesConf[index]
-
-		var debugAddr []string
-
-		if len(debugAddresses) > index {
-			debugAddr = append(debugAddr, debugAddresses[index])
-		}
+		debugAddress := nodes[index].DebugAddress
 
 		config := config.Config{
 			GrpcServer: net.Config{
@@ -118,7 +112,7 @@ func GenerateFullNodesConfigs(types []nodeconf.NodeType, addresses []string, deb
 			},
 			Account: account,
 			APIServer: net.Config{
-				Server: net.ServerConfig{ListenAddrs: debugAddr},
+				Server: net.ServerConfig{ListenAddrs: []string{debugAddress}},
 				Stream: stream,
 			},
 			Nodes: nodesConf,

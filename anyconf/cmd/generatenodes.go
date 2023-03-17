@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	addressesFlag = "addresses"
-	nodesYaml     = "nodes.yml"
+	addressesFlag    = "addresses"
+	debugAddressFlag = "d"
+	nodesYaml        = "nodes.yml"
 )
 
 var generateNodes = &cobra.Command{
@@ -22,9 +23,10 @@ var generateNodes = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		addresses, err := cmd.Flags().GetStringArray(addressesFlag)
 		types, err := cmd.Flags().GetStringArray(typesFlag)
+		debugAddresses, err := cmd.Flags().GetStringArray(debugAddressFlag)
 
-		var nodeTypes []nodeconf.NodeType
-		for _, nodeType := range types {
+		var nodesParams []gen.NodeParameters
+		for i, nodeType := range types {
 			nodeType := nodeconf.NodeType(nodeType)
 
 			if !slices.Contains(validOptions, nodeType) {
@@ -32,10 +34,26 @@ var generateNodes = &cobra.Command{
 				panic("Wrong node 'type' parameter")
 			}
 
-			nodeTypes = append(nodeTypes, nodeType)
+			debugAddress := ""
+			if len(debugAddresses) > i {
+				debugAddress = debugAddresses[i]
+			}
+
+			grpcAddress := ""
+			if len(addresses) > i {
+				grpcAddress = addresses[i]
+			}
+
+			nodeParams := gen.NodeParameters{
+				DebugAddress: debugAddress,
+				Address:      grpcAddress,
+				NodeType:     nodeType,
+			}
+
+			nodesParams = append(nodesParams, nodeParams)
 		}
 
-		nodesList, accountsList, err := gen.GenerateNodesConfigs(nodeTypes, addresses)
+		nodesList, accountsList, err := gen.GenerateNodesConfigs(nodesParams)
 		nodes := Nodes{nodesList}
 
 		nodesBytes, err := yaml.Marshal(nodes)
@@ -67,5 +85,7 @@ func init() {
 	generateNodes.Flags().StringArray(typesFlag, []string{}, "fill this flag with one of three options [tree, file, coordinator]")
 	generateNodes.MarkFlagRequired(typesFlag)
 
-	generateNodes.Flags().StringArray(addressesFlag, []string{}, "")
+	generateNodes.Flags().StringArray(debugAddressFlag, []string{}, "fill this flag with specific debug address for node")
+
+	generateNodes.Flags().StringArray(addressesFlag, []string{}, "fill this flag with specific grpc address for node")
 }
