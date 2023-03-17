@@ -18,12 +18,11 @@ import (
 	"github.com/anytypeio/any-sync/util/peer"
 	"github.com/anytypeio/go-anytype-infrastructure-experiments/client/badgerprovider"
 	clconfig "github.com/anytypeio/go-anytype-infrastructure-experiments/client/config"
-	sysnet "net"
 )
 
 type NodeParameters struct {
-	DebugAddress, Address string
-	NodeType              nodeconf.NodeType
+	DebugAddress, Address, DBPath string
+	NodeType                      nodeconf.NodeType
 }
 
 func GenNodeConfig(addresses []string, types []nodeconf.NodeType) (nodeconf.NodeConfig, accountservice.Config, error) {
@@ -103,8 +102,7 @@ func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []config.
 	for index, account := range accounts {
 		nodeConf := nodesConf[index]
 		debugAddress := nodes[index].DebugAddress
-		debugPort, _ := parsePort(debugAddress)
-
+		dbPath := nodes[index].DBPath
 		config := config.Config{
 			GrpcServer: net.Config{
 				Server: net.ServerConfig{ListenAddrs: nodeConf.Addresses},
@@ -120,7 +118,7 @@ func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []config.
 				GCTTL:      60,
 				SyncPeriod: 20,
 			},
-			Storage: nodestorage.Config{Path: fmt.Sprintf("db/client/%s", debugPort)},
+			Storage: nodestorage.Config{Path: dbPath},
 			Metric:  metric.Config{""},
 			Log: logger.Config{
 				Production:   false,
@@ -132,7 +130,6 @@ func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []config.
 				PeriodicSyncHours: 0,
 			},
 		}
-
 		fullNodesConfig = append(fullNodesConfig, config)
 	}
 
@@ -210,9 +207,4 @@ func GenerateClientConfig(nodesConfig []nodeconf.NodeConfig, address string, grp
 			SyncPeriod: 20,
 		},
 	}, nil
-}
-
-func parsePort(s string) (port string, err error) {
-	_, port, err = sysnet.SplitHostPort(s)
-	return
 }
