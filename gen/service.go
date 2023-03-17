@@ -18,8 +18,6 @@ import (
 	"github.com/anytypeio/any-sync/util/peer"
 	"github.com/anytypeio/go-anytype-infrastructure-experiments/client/badgerprovider"
 	clconfig "github.com/anytypeio/go-anytype-infrastructure-experiments/client/config"
-	"gopkg.in/yaml.v3"
-	"io/ioutil"
 )
 
 type NodeParameters struct {
@@ -140,19 +138,7 @@ func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []config.
 }
 
 // Temporary here
-func GenerateClientConfig(nodesConfigPath, address string, grpcPort, debugPort int) (cfg clconfig.Config, err error) {
-	nodesConfig := clconfig.Config{}
-
-	data, err := ioutil.ReadFile(nodesConfigPath)
-	if err != nil {
-		return
-	}
-
-	err = yaml.Unmarshal(data, &nodesConfig)
-	if err != nil {
-		return
-	}
-
+func GenerateClientConfig(nodesConfig []nodeconf.NodeConfig, address string, grpcPort, debugPort int) (cfg clconfig.Config, err error) {
 	encClientKey, _, err := encryptionkey.GenerateRandomRSAKeyPair(2048)
 	if err != nil {
 		panic(fmt.Sprintf("could not generate client encryption key: %s", err.Error()))
@@ -217,7 +203,7 @@ func GenerateClientConfig(nodesConfigPath, address string, grpcPort, debugPort i
 				MaxMsgSizeMb:        256,
 			},
 		},
-		Nodes: nodesConfig.Nodes,
+		Nodes: nodesConfig,
 		Space: commonspace.Config{
 			GCTTL:      60,
 			SyncPeriod: 20,
