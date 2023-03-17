@@ -28,7 +28,7 @@ type Nodes struct {
 
 type PrivateConf struct {
 	Account accountservice.Config `yaml:"account"`
-	Nodes   []nodeconf.NodeConfig `yaml:"nodes"`
+	Nodes   []nodeconf.NodeConfig `yaml:"nodes,omitempty"`
 }
 
 var addNode = &cobra.Command{
