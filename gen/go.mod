@@ -9,6 +9,20 @@ require (
 )
 
 require (
+	github.com/anytypeio/any-sync-coordinator v0.0.4 // indirect
+	github.com/gobwas/glob v0.2.3 // indirect
+	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
+	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.1.1 // indirect
+	github.com/xdg-go/stringprep v1.0.3 // indirect
+	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
+	go.mongodb.org/mongo-driver v1.11.2 // indirect
+	golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3 // indirect
+	golang.org/x/sync v0.1.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
+)
+
+require (
 	github.com/anytypeio/any-sync-node v0.0.21
 	github.com/anytypeio/go-chash v0.0.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

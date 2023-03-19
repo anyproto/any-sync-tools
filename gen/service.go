@@ -2,6 +2,9 @@ package gen
 
 import (
 	"fmt"
+	coordinatorConf "github.com/anytypeio/any-sync-coordinator/config"
+	"github.com/anytypeio/any-sync-coordinator/db"
+	"github.com/anytypeio/any-sync-coordinator/spacestatus"
 	"github.com/anytypeio/any-sync-node/config"
 	"github.com/anytypeio/any-sync-node/nodestorage"
 	"github.com/anytypeio/any-sync-node/nodesync"
@@ -19,6 +22,13 @@ import (
 	"github.com/anytypeio/go-anytype-infrastructure-experiments/client/badgerprovider"
 	clconfig "github.com/anytypeio/go-anytype-infrastructure-experiments/client/config"
 )
+
+type NodeConfigInfo struct {
+	Config         any
+	DebugApiServer net.Config
+	Account        commonaccount.Config
+	Nodes          []nodeconf.NodeConfig
+}
 
 type NodeParameters struct {
 	DebugAddress, Address, DBPath string
@@ -87,7 +97,7 @@ func GenerateNodesConfigs(nodes []NodeParameters) (nodesConf []nodeconf.NodeConf
 	return
 }
 
-func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []config.Config, err error) {
+func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []NodeConfigInfo, err error) {
 	nodesConf, accounts, err := GenerateNodesConfigs(nodes)
 
 	if err != nil {
@@ -102,35 +112,66 @@ func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []config.
 	for index, account := range accounts {
 		nodeConf := nodesConf[index]
 		debugAddress := nodes[index].DebugAddress
-		dbPath := nodes[index].DBPath
-		config := config.Config{
-			GrpcServer: net.Config{
-				Server: net.ServerConfig{ListenAddrs: nodeConf.Addresses},
-				Stream: stream,
-			},
-			Account: account,
-			APIServer: net.Config{
-				Server: net.ServerConfig{ListenAddrs: []string{debugAddress}},
-				Stream: stream,
-			},
-			Nodes: nodesConf,
-			Space: commonspace.Config{
-				GCTTL:      60,
-				SyncPeriod: 20,
-			},
-			Storage: nodestorage.Config{Path: dbPath},
-			Metric:  metric.Config{""},
-			Log: logger.Config{
-				Production:   false,
-				DefaultLevel: "",
-				NamedLevels:  make(map[string]string),
-			},
-			NodeSync: nodesync.Config{
-				SyncOnStart:       false,
-				PeriodicSyncHours: 0,
-			},
+		nodeType := nodes[index].NodeType
+		debugServer := net.Config{
+			Server: net.ServerConfig{ListenAddrs: []string{debugAddress}},
+			Stream: stream,
 		}
-		fullNodesConfig = append(fullNodesConfig, config)
+		dbPath := nodes[index].DBPath
+		grpcServcer := net.Config{
+			Server: net.ServerConfig{ListenAddrs: nodeConf.Addresses},
+			Stream: stream,
+		}
+
+		var anyConf any
+
+		switch nodeType {
+		case nodeconf.NodeTypeCoordinator:
+			anyConf = coordinatorConf.Config{
+				Account:    account,
+				GrpcServer: grpcServcer,
+				Metric:     metric.Config{""},
+				Nodes:      nodesConf,
+				Mongo: db.Mongo{
+					Connect:          "mongodb://localhost:27017",
+					Database:         "coordinator_test",
+					SpacesCollection: "spaces",
+					LogCollection:    "log",
+				},
+				SpaceStatus: spacestatus.Config{RunSeconds: 20, DeletionPeriodDays: 0},
+			}
+		default:
+			anyConf = config.Config{
+				GrpcServer: grpcServcer,
+				Account:    account,
+				APIServer:  debugServer,
+				Nodes:      nodesConf,
+				Space: commonspace.Config{
+					GCTTL:      60,
+					SyncPeriod: 20,
+				},
+				Storage: nodestorage.Config{Path: dbPath},
+				Metric:  metric.Config{""},
+				Log: logger.Config{
+					Production:   false,
+					DefaultLevel: "",
+					NamedLevels:  make(map[string]string),
+				},
+				NodeSync: nodesync.Config{
+					SyncOnStart:       false,
+					PeriodicSyncHours: 0,
+				},
+			}
+		}
+
+		nodeInfo := NodeConfigInfo{
+			Config:         anyConf,
+			DebugApiServer: debugServer,
+			Account:        account,
+			Nodes:          nodesConf,
+		}
+
+		fullNodesConfig = append(fullNodesConfig, nodeInfo)
 	}
 
 	return
