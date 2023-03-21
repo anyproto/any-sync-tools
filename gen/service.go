@@ -226,7 +226,7 @@ func GenerateClientConfig(nodesConfig []nodeconf.NodeConfig, address string, grp
 				MaxMsgSizeMb:        256,
 			},
 		},
-		Storage: badgerprovider.Config{Path: fmt.Sprintf("db/client/%d", debugPort)},
+		Storage: badgerprovider.Config{Path: fmt.Sprintf("db/client/%d/data", debugPort)},
 		Account: commonaccount.Config{
 			PeerId:        peerID.String(),
 			PeerKey:       encPeerKey,
