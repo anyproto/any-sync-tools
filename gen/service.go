@@ -97,8 +97,9 @@ func GenerateNodesConfigs(nodes []NodeParameters) (nodesConf []nodeconf.NodeConf
 	return
 }
 
-func GenerateFullNodesConfigs(nodes []NodeParameters) (fullNodesConfig []NodeConfigInfo, err error) {
+func GenerateFullNodesConfigs(nodes []NodeParameters, additionalAccounts []nodeconf.NodeConfig) (fullNodesConfig []NodeConfigInfo, err error) {
 	nodesConf, accounts, err := GenerateNodesConfigs(nodes)
+	nodesConf = append(nodesConf, additionalAccounts...)
 
 	if err != nil {
 		panic(err)
