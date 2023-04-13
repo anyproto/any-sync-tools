@@ -1,33 +1,18 @@
 package gen
 
 import (
-	"fmt"
-	coordinatorConf "github.com/anytypeio/any-sync-coordinator/config"
-	"github.com/anytypeio/any-sync-coordinator/db"
-	"github.com/anytypeio/any-sync-coordinator/spacestatus"
-	"github.com/anytypeio/any-sync-node/config"
-	"github.com/anytypeio/any-sync-node/nodestorage"
-	"github.com/anytypeio/any-sync-node/nodesync"
 	"github.com/anytypeio/any-sync/accountservice"
-	commonaccount "github.com/anytypeio/any-sync/accountservice"
-	"github.com/anytypeio/any-sync/app/logger"
-	"github.com/anytypeio/any-sync/commonspace"
-	"github.com/anytypeio/any-sync/metric"
 	"github.com/anytypeio/any-sync/net"
 	"github.com/anytypeio/any-sync/nodeconf"
-	"github.com/anytypeio/any-sync/util/keys"
-	"github.com/anytypeio/any-sync/util/keys/asymmetric/encryptionkey"
-	"github.com/anytypeio/any-sync/util/keys/asymmetric/signingkey"
-	"github.com/anytypeio/any-sync/util/peer"
-	"github.com/anytypeio/go-anytype-infrastructure-experiments/client/badgerprovider"
-	clconfig "github.com/anytypeio/go-anytype-infrastructure-experiments/client/config"
+	"github.com/anytypeio/any-sync/util/crypto"
+	"golang.org/x/exp/slices"
 )
 
 type NodeConfigInfo struct {
 	Config         any
 	DebugApiServer net.Config
-	Account        commonaccount.Config
-	Nodes          []nodeconf.NodeConfig
+	Account        accountservice.Config
+	Nodes          nodeconf.Configuration
 }
 
 type NodeParameters struct {
@@ -35,56 +20,47 @@ type NodeParameters struct {
 	NodeType                      nodeconf.NodeType
 }
 
-func GenNodeConfig(addresses []string, types []nodeconf.NodeType) (nodeconf.NodeConfig, accountservice.Config, error) {
-	encKey, _, err := encryptionkey.GenerateRandomRSAKeyPair(2048)
+func GenNodeConfig(addresses []string, types []nodeconf.NodeType, netKey crypto.PrivKey) (nc nodeconf.Node, ac accountservice.Config, err error) {
+
+	signKey, _, err := crypto.GenerateRandomEd25519KeyPair()
 	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
+		return
 	}
 
-	signKey, _, err := signingkey.GenerateRandomEd25519KeyPair()
+	encPeerSignKey, err := crypto.EncodeKeyToString(signKey) //encSignKey
 	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
+		return
 	}
 
-	encPubKey := encKey.GetPublic()
-	encPubKeyString, err := keys.EncodeKeyToString(encPubKey)
+	peerID := signKey.GetPublic().PeerId()
 
-	encEncKey, err := keys.EncodeKeyToString(encKey) // private key
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
+	nc = nodeconf.Node{
+		PeerId:    peerID,
+		Addresses: addresses,
+		Types:     types,
 	}
 
-	encSignKey, err := keys.EncodeKeyToString(signKey) //encSignKey
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
+	encSignKey := encPeerSignKey
+	if slices.Contains(types, nodeconf.NodeTypeCoordinator) {
+		if netKey != nil {
+			encSignKey, _ = crypto.EncodeKeyToString(netKey)
+		} else {
+			encSignKey = ""
+		}
 	}
 
-	peerID, err := peer.IdFromSigningPubKey(signKey.GetPublic())
-
-	if err != nil {
-		return nodeconf.NodeConfig{}, accountservice.Config{}, err
+	ac = accountservice.Config{
+		PeerId:     peerID,
+		PeerKey:    encPeerSignKey,
+		SigningKey: encSignKey,
 	}
 
-	nodeconfig := nodeconf.NodeConfig{
-		PeerId:        peerID.String(),
-		Addresses:     addresses,
-		EncryptionKey: encPubKeyString,
-		Types:         types,
-	}
-
-	accountConfig := accountservice.Config{
-		PeerId:        peerID.String(),
-		PeerKey:       encSignKey,
-		SigningKey:    encSignKey,
-		EncryptionKey: encEncKey,
-	}
-
-	return nodeconfig, accountConfig, nil
+	return
 }
 
-func GenerateNodesConfigs(nodes []NodeParameters) (nodesConf []nodeconf.NodeConfig, accounts []accountservice.Config, err error) {
+func GenerateNodesConfigs(nodes []NodeParameters) (nodesConf []nodeconf.Node, accounts []accountservice.Config, err error) {
 	for _, node := range nodes {
-		commonConfig, accountConfig, err := GenNodeConfig([]string{node.Address}, []nodeconf.NodeType{node.NodeType})
+		commonConfig, accountConfig, err := GenNodeConfig([]string{node.Address}, []nodeconf.NodeType{node.NodeType}, nil)
 
 		if err != nil {
 			panic(err)
@@ -97,7 +73,10 @@ func GenerateNodesConfigs(nodes []NodeParameters) (nodesConf []nodeconf.NodeConf
 	return
 }
 
-func GenerateFullNodesConfigs(nodes []NodeParameters, additionalAccounts []nodeconf.NodeConfig) (fullNodesConfig []NodeConfigInfo, err error) {
+/*
+
+
+func GenerateFullNodesConfigs(nodes []NodeParameters, additionalAccounts []nodeconf.Node) (fullNodesConfig []NodeConfigInfo, err error) {
 	nodesConf, accounts, err := GenerateNodesConfigs(nodes)
 	nodesConf = append(nodesConf, additionalAccounts...)
 
@@ -250,3 +229,4 @@ func GenerateClientConfig(nodesConfig []nodeconf.NodeConfig, address string, grp
 		},
 	}, nil
 }
+*/

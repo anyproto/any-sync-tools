@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/anytypeio/any-sync-tools/gen"
+	"github.com/anytypeio/any-sync-tools/anyconf/gen"
 	"github.com/anytypeio/any-sync/nodeconf"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v3"
 	"os"
+	"time"
 )
 
 const (
@@ -29,7 +31,7 @@ var generateNodes = &cobra.Command{
 		for i, nodeType := range types {
 			nodeType := nodeconf.NodeType(nodeType)
 
-			if !slices.Contains(validOptions, nodeType) {
+			if !slices.Contains(validTypesOptions, nodeType) {
 				fmt.Println(nodeType)
 				panic("Wrong node 'type' parameter")
 			}
@@ -54,7 +56,12 @@ var generateNodes = &cobra.Command{
 		}
 
 		nodesList, accountsList, err := gen.GenerateNodesConfigs(nodesParams)
-		nodes := Nodes{nodesList}
+		nodes := nodeconf.Configuration{
+			Id:           bson.NewObjectId().Hex(),
+			NetworkId:    "",
+			Nodes:        nodesList,
+			CreationTime: time.Time{},
+		}
 
 		nodesBytes, err := yaml.Marshal(nodes)
 		if err != nil {

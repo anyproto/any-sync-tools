@@ -25,4 +25,5 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(addNode)
 	rootCmd.AddCommand(generateNodes)
+	rootCmd.AddCommand(createNetwork)
 }

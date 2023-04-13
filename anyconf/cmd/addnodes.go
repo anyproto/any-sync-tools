@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/anytypeio/any-sync-tools/gen"
+	"github.com/anytypeio/any-sync-tools/anyconf/gen"
 	"github.com/anytypeio/any-sync/accountservice"
 	"github.com/anytypeio/any-sync/nodeconf"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
 	"os"
+	"time"
 )
 
 const (
@@ -20,15 +21,14 @@ const (
 	addressFlag           = "address"
 )
 
-var validOptions = []nodeconf.NodeType{nodeconf.NodeTypeTree, nodeconf.NodeTypeFile, nodeconf.NodeTypeConsensus, nodeconf.NodeTypeCoordinator}
+var validTypesOptions = []nodeconf.NodeType{nodeconf.NodeTypeTree, nodeconf.NodeTypeFile, nodeconf.NodeTypeConsensus, nodeconf.NodeTypeCoordinator}
 
 type Nodes struct {
-	Nodes []nodeconf.NodeConfig `yaml:"nodes"`
+	Nodes []nodeconf.Node `yaml:"nodes"`
 }
 
 type PrivateConf struct {
 	Account accountservice.Config `yaml:"account"`
-	Nodes   []nodeconf.NodeConfig `yaml:"nodes,omitempty"`
 }
 
 var addNode = &cobra.Command{
@@ -50,9 +50,9 @@ var addNode = &cobra.Command{
 			panic("You should specify at least one node type")
 		}
 
-		nodesConfig := Nodes{}
+		nodesConfig := nodeconf.Configuration{}
 
-		data, err := ioutil.ReadFile(nodesConfigPath)
+		data, err := os.ReadFile(nodesConfigPath)
 		if err != nil {
 			panic("Couldn't read file")
 		}
@@ -68,8 +68,8 @@ var addNode = &cobra.Command{
 		for _, nodeType := range types {
 			nodeType := nodeconf.NodeType(nodeType)
 
-			if !slices.Contains(validOptions, nodeType) {
-				panic("Wrong node 'type' parameter")
+			if !slices.Contains(validTypesOptions, nodeType) {
+				panic(fmt.Errorf("wrong node 'type' parameter: '%s'", nodeType))
 			}
 
 			nodeTypes = append(nodeTypes, nodeType)
@@ -79,9 +79,10 @@ var addNode = &cobra.Command{
 			addresses = append(addresses, address)
 		}
 
-		newConf, accountConf, err := gen.GenNodeConfig(addresses, nodeTypes)
+		newConf, accountConf, err := gen.GenNodeConfig(addresses, nodeTypes, nil)
 		nodesConfig.Nodes = append(nodesConfig.Nodes, newConf)
-
+		nodesConfig.Id = bson.NewObjectId().Hex()
+		nodesConfig.CreationTime = time.Now()
 		bytes, err := yaml.Marshal(nodesConfig)
 		if err != nil {
 			panic(fmt.Sprintf("could not marshal the keys: %v", err))
@@ -94,7 +95,6 @@ var addNode = &cobra.Command{
 
 		privateConf := PrivateConf{
 			Account: accountConf,
-			Nodes:   nodesConfig.Nodes,
 		}
 
 		bytes, err = yaml.Marshal(privateConf)
