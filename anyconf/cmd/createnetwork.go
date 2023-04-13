@@ -37,7 +37,12 @@ var createNetwork = &cobra.Command{
 			nodeTypes = append(nodeTypes, nodeconf.NodeTypeCoordinator)
 		}
 		netKey, _, _ := crypto.GenerateRandomEd25519KeyPair()
-		nc, ac, err := gen.GenNodeConfig([]string{address}, []nodeconf.NodeType{nodeconf.NodeTypeCoordinator}, netKey)
+
+		var addresses []string
+		if address != "" {
+			addresses = append(addresses, address)
+		}
+		nc, ac, err := gen.GenNodeConfig(addresses, []nodeconf.NodeType{nodeconf.NodeTypeCoordinator}, netKey)
 		if err != nil {
 			panic(fmt.Errorf("can't generate configs: %v", err))
 		}
