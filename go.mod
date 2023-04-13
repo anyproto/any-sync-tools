@@ -1,4 +1,4 @@
-module github.com/anytypeio/any-sync-tools/anyconf
+module github.com/anytypeio/any-sync-tools
 
 go 1.19
 

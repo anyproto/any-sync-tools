@@ -97,6 +97,10 @@ var addNode = &cobra.Command{
 			Account: accountConf,
 		}
 
+		fmt.Println("Node created")
+		fmt.Printf("PeerId:\t%s\n", accountConf.PeerId)
+		fmt.Printf("ConfigurationId:\t%s\n", nodesConfig.Id)
+
 		bytes, err = yaml.Marshal(privateConf)
 		if err != nil {
 			panic(fmt.Sprintf("could not marshal the keys: %v", err))
