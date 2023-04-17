@@ -5,7 +5,6 @@ go 1.19
 require (
 	github.com/anytypeio/any-sync v0.28.1-0.20230413170622-eb8f76037034
 	github.com/spf13/cobra v1.6.1
-	go.mongodb.org/mongo-driver v1.11.4
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/yaml.v3 v3.0.1
