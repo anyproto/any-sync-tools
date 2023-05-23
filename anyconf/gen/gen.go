@@ -1,10 +1,10 @@
 package gen
 
 import (
-	"github.com/anytypeio/any-sync/accountservice"
-	"github.com/anytypeio/any-sync/net"
-	"github.com/anytypeio/any-sync/nodeconf"
-	"github.com/anytypeio/any-sync/util/crypto"
+	"github.com/anyproto/any-sync/accountservice"
+	"github.com/anyproto/any-sync/net"
+	"github.com/anyproto/any-sync/nodeconf"
+	"github.com/anyproto/any-sync/util/crypto"
 	"golang.org/x/exp/slices"
 )
 

@@ -2,13 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/anytypeio/any-sync-tools/anyconf/gen"
-	"github.com/anytypeio/any-sync/nodeconf"
-	"github.com/anytypeio/any-sync/util/crypto"
+	"github.com/anyproto/any-sync-tools/anyconf/gen"
+	"github.com/anyproto/any-sync/nodeconf"
+	"github.com/anyproto/any-sync/util/crypto"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"gopkg.in/mgo.v2/bson"
-	"gopkg.in/yaml.v3"
 	"os"
 	"time"
 )
