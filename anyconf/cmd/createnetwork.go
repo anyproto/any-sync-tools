@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/yaml.v3"
 	"os"
 	"time"
 )
@@ -85,12 +86,8 @@ var createNetwork = &cobra.Command{
 }
 
 func init() {
-
 	createNetwork.Flags().StringArray(typesFlag, []string{}, "fill this flag with one of three options [tree, file, coordinator]")
-
 	createNetwork.Flags().String(outputNodesPathFlag, "nodes.yml", "Path to output nodes yaml with a new node")
-
 	createNetwork.Flags().String(addressFlag, "", "Address to node [optional]")
-
 	createNetwork.Flags().String(outputAccountPathFlag, "account.yml", "Path to output account + nodes yaml")
 }
