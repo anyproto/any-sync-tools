@@ -88,10 +88,14 @@ type Node struct {
 	Types     []string `yaml:"types"`
 }
 
+type HeartConfig struct {
+	NetworkID string `yaml:"networkId"`
+	Nodes     []Node `yaml:"nodes"`
+}
+
 type Network struct {
-	ID           string    `yaml:"id"`
-	NetworkID    string    `yaml:"networkId"`
-	Nodes        []Node    `yaml:"nodes"`
+	ID           string `yaml:"id"`
+	HeartConfig  `yaml:".,inline"`
 	CreationTime time.Time `yaml:"creationTime"`
 }
 
@@ -103,11 +107,13 @@ var create = &cobra.Command{
 		fmt.Println("Creating network...")
 		netKey, _, _ := crypto.GenerateRandomEd25519KeyPair()
 		network = Network{
-			ID:           bson.NewObjectId().Hex(),
-			NetworkID:    netKey.GetPublic().Network(),
-			Nodes:        []Node{},
-			CreationTime: time.Now(),
+			HeartConfig: HeartConfig{
+				Nodes: []Node{},
+			},
 		}
+		network.ID = bson.NewObjectId().Hex()
+		network.NetworkID = netKey.GetPublic().Network()
+		network.CreationTime = time.Now()
 
 		fmt.Println("\033[1m  Network ID:\033[0m", network.NetworkID)
 
@@ -183,6 +189,8 @@ var create = &cobra.Command{
 			fileNode.Network = network
 			createConfigFile(fileNode, "file_"+strconv.Itoa(i+1))
 		}
+
+		createConfigFile(network.HeartConfig, "heart")
 
 		fmt.Println("Done!")
 	},

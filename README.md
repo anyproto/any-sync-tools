@@ -17,7 +17,7 @@ Note that there are prerequisites for successful configuration:
 1. `consensus-node` requires MongoDB.
 2. `file-node` requires an S3 bucket and Redis.
 
-You can use the generated `*.yml` files as your nodes' configurations.
+You can use the generated `*.yml` files as your nodes' and `anytype-heart`'s configurations.
 
 ### Example
 ![Interactive CLI demo](assets/any-sync-network-example.gif)
