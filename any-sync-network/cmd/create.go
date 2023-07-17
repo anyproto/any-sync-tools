@@ -71,6 +71,7 @@ type FileNodeConfig struct {
 	GeneralNodeConfig        `yaml:".,inline"`
 	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 	S3Store                  struct {
+		Endpoint   string `yaml:"endpoint,omitempty"`
 		Region     string `yaml:"region"`
 		Profile    string `yaml:"profile"`
 		Bucket     string `yaml:"bucket"`
@@ -261,6 +262,14 @@ func createFileNode() {
 			Validate: survey.Required,
 		},
 		{
+			Name: "s3Endpoint",
+			Prompt: &survey.Input{
+				Message: "S3 Endpoint",
+				// Default: "",
+				Help: "Required only in the case you self-host S3-compatible object storage",
+			},
+		},
+		{
 			Name: "s3Region",
 			Prompt: &survey.Input{
 				Message: "S3 Region",
@@ -305,6 +314,7 @@ func createFileNode() {
 
 	answers := struct {
 		Address      string
+		S3Endpoint   string
 		S3Region     string
 		S3Profile    string
 		S3Bucket     string
@@ -320,6 +330,7 @@ func createFileNode() {
 
 	fileNode := defaultFileNode()
 	fileNode.Yamux.ListenAddrs = append(fileNode.Yamux.ListenAddrs, answers.Address)
+	fileNode.S3Store.Endpoint = answers.S3Endpoint
 	fileNode.S3Store.Region = answers.S3Region
 	fileNode.S3Store.Profile = answers.S3Profile
 	fileNode.S3Store.Bucket = answers.S3Bucket
@@ -465,6 +476,7 @@ func defaultFileNode() FileNodeConfig {
 		GeneralNodeConfig:        defaultGeneralNode(),
 		NetworkUpdateIntervalSec: 600,
 		S3Store: struct {
+			Endpoint   string "yaml:\"endpoint,omitempty\""
 			Region     string "yaml:\"region\""
 			Profile    string "yaml:\"profile\""
 			Bucket     string "yaml:\"bucket\""

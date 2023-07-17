@@ -15,7 +15,7 @@ Use the interactive CLI to describe the parameters of basic nodes and create add
 
 Note that there are prerequisites for successful configuration:
 1. `consensus-node` requires MongoDB.
-2. `file-node` requires an S3 bucket and Redis.
+2. `file-node` requires an S3-compatible object storage and Redis.
 
 You can use the generated `*.yml` files as your nodes' and `anytype-heart`'s configurations.
 
