@@ -1,15 +1,19 @@
-# Any-Sync Tools
+# Any-Sync Netcheck
 
-## `any-sync-network`
+A simple tool that checks the ability to connect to any-sync nodes. 
+It tests network and TLS issues.
 
-Configuration builder for Any-Sync nodes. 
-See the tool [`README`](any-sync-network/README.md) for more details.
+The tool opens a connection to coordinator nodes and performs libp2p and any-sync handshakes, attempting to request a network configuration.
 
-## `any-sync-netcheck`
+## Installation
+You can download the binary release here: https://github.com/anyproto/any-sync-tools/releases  
 
-Network issues debugger for any-sync networks.
-See the tool [`README`](any-sync-netcheck/README.md) for more details.
+### Build from source   
+```go install github.com/anyproto/any-sync-tools/any-sync-netcheck@latest```
 
+## Usage
+```any-sync-netcheck```  
+```any-sync-netcheck -v```  for a verbose output
 
 ## Contribution
 Thank you for your desire to develop Anytype together!
@@ -25,4 +29,4 @@ Thank you for your desire to develop Anytype together!
 ---
 Made by Any — a Swiss association 🇨🇭
 
-Licensed under [MIT License](./LICENSE).
+Licensed under [MIT License](../LICENSE).
