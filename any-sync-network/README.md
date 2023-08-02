@@ -1,15 +1,28 @@
 # Any-Sync Tools
 
 ## `any-sync-network`
+Configuration builder for Any-Sync nodes.
 
-Configuration builder for Any-Sync nodes.  
-[Documentation](https://github.com/anyproto/any-sync-tools/tree/main/any-sync-network)
+### Installation
+1. Clone `any-sync-tools` repository.
+2. Navigate to the root directory of the repository and run `go install ./any-sync-network`.
 
+### Usage
+```
+any-sync-network create
+```
+Use the interactive CLI to describe the parameters of basic nodes and create additional nodes if needed. 
 
-## `any-sync-netcheck`
+Note that there are prerequisites for successful configuration:
+1. `consensus-node` requires MongoDB.
+2. `file-node` requires an S3-compatible object storage and Redis.
 
-Tool to debug network issues in anytype network.   
-[Documentation](https://github.com/anyproto/any-sync-tools/tree/main/any-sync-netcheck)
+You can use the generated `*.yml` files as your nodes' and `anytype-heart`'s configurations.
+
+### Example
+![Interactive CLI demo](assets/any-sync-network-example.gif)
+
+Configuring a network with three sync nodes and one file node.
 
 
 ## Contribution
