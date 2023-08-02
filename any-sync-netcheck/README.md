@@ -11,3 +11,7 @@ You can download the binary release here: https://github.com/anyproto/any-sync-t
 
 #### Build from source:   
 ```go install github.com/anyproto/any-sync-tools/any-sync-netcheck@latest```
+
+### Running
+```any-sync-netcheck```  
+```any-sync-netcheck -v```  for a verbose output
