@@ -1,0 +1,175 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: release
+
+permissions: write-all
+
+jobs:
+  create_release:
+    name: create release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          GITHUB_TOKEN: ${{ secrets.ANYTYPE_PAT }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+  build:
+    name: build release
+    runs-on: ubuntu-22.04
+    needs: create_release
+    strategy:
+      matrix:
+        arch:
+          - amd64
+          - arm64
+        os:
+          - linux
+          - windows
+          - darwin
+        go-version:
+          - 1.19.5
+        include:
+          - arch: amd64
+            rpm_arch: x86_64
+          - arch: arm64
+            rpm_arch: aarch64
+    env:
+      GOPRIVATE: github.com/anyproto
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '${{ matrix.go-version }}'
+      - name: git config
+        run: git config --global url.https://${{ secrets.ANYTYPE_PAT }}@github.com/.insteadOf https://github.com/
+      # cache {{
+      - id: go-cache-paths
+        run: |
+          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+          echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ${{ steps.go-cache-paths.outputs.GOCACHE }}
+            ${{ steps.go-cache-paths.outputs.GOMODCACHE }}
+          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ matrix.os }}-${{ matrix.arch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.go-version }}-${{ matrix.os }}-${{ matrix.arch }}-
+      # }}
+
+      # build {{
+      - name: deps
+        run: make deps
+
+      #- name: unit tests
+      #  run: make test
+
+      - name: build
+        run: make build BUILD_GOOS=${{ matrix.os}} BUILD_GOARCH=${{ matrix.arch }}
+      # }}
+
+      - name: get release version
+        id: release-version
+        run: |
+          echo "$GITHUB_REF_NAME" | sed 's|^[a-zA-Z]\+|RELEASE_VERSION=|' >> $GITHUB_OUTPUT
+
+      # create asset {{
+      - name: create archives
+        run: |
+          zip --junk-paths ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip bin/*
+          tar \
+            --create \
+            --gzip \
+            --verbose \
+            --exclude='.gitignore' \
+            --file=${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz \
+            --directory=bin/ \
+            .
+      - name: create package deb
+        if: matrix.os == 'linux'
+        uses: bpicode/github-action-fpm@master
+        with:
+          fpm_opts:
+            --name ${{ github.event.repository.name }}
+            --version ${{ steps.release-version.outputs.RELEASE_VERSION }}
+            --architecture ${{ matrix.arch }}
+            --exclude '*/.gitignore'
+            --exclude '*/.git'
+            --input-type dir
+            --output-type deb
+          fpm_args: ./bin
+      - name: create package rpm
+        if: matrix.os == 'linux'
+        uses: bpicode/github-action-fpm@master
+        with:
+          fpm_opts:
+            --name ${{ github.event.repository.name }}
+            --version ${{ steps.release-version.outputs.RELEASE_VERSION }}
+            --architecture ${{ matrix.rpm_arch }}
+            --exclude '*/.gitignore'
+            --exclude '*/.git'
+            --input-type dir
+            --output-type rpm
+          fpm_args: ./bin
+      # }}
+
+      - name: debug
+        run: |
+          ls -al ./
+
+      # upload-release-asset {{
+      - name: upload-release-asset zip
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip
+          asset_name: ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip
+          asset_content_type: application/zip
+
+      - name: upload-release-asset tgz
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz
+          asset_name: ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz
+          asset_content_type: application/gzip
+
+      - name: upload-release-asset deb
+        if: matrix.os == 'linux'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./${{ github.event.repository.name }}_${{ steps.release-version.outputs.RELEASE_VERSION }}_${{ matrix.arch }}.deb
+          asset_name: ${{ github.event.repository.name }}_${{ steps.release-version.outputs.RELEASE_VERSION }}_${{ matrix.arch }}.deb
+          asset_content_type: application/octet-stream
+
+      - name: upload-release-asset rpm
+        if: matrix.os == 'linux'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}-1.${{ matrix.rpm_arch }}.rpm
+          asset_name: ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}-1.${{ matrix.rpm_arch }}.rpm
+          asset_content_type: application/octet-stream
+      # }}
