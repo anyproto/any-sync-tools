@@ -50,7 +50,7 @@ func main() {
 		panic(err)
 	}
 
-	var addrs = []string{"prod-any-sync-coordinator1.toolpad.org:443", "prod-any-sync-coordinator2.toolpad.org:443", "prod-any-sync-coordinator3.toolpad.org:443"}
+	var addrs = []string{"prod-any-sync-coordinator1.toolpad.org:443", "prod-any-sync-coordinator1.toolpad.org:1443"}
 	for _, addr := range addrs {
 		probe(a, addr)
 	}
