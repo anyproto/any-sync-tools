@@ -124,7 +124,7 @@ jobs:
             --input-type dir
             --output-type rpm
           fpm_args: ./bin
-       }}
+      # }}
 
       - name: debug
         run: |
