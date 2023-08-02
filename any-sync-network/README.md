@@ -1,13 +1,15 @@
-# Any-Sync Tools
-
-## `any-sync-network`
+# Any-Sync Network
 Configuration builder for Any-Sync nodes.
 
-### Installation
-1. Clone `any-sync-tools` repository.
-2. Navigate to the root directory of the repository and run `go install ./any-sync-network`.
+## Installation
+You can download the binary release here: https://github.com/anyproto/any-sync-tools/releases  
 
-### Usage
+#### Build from source   
+```
+go install github.com/anyproto/any-sync-tools/any-sync-network@latest
+```
+
+## Usage
 ```
 any-sync-network create
 ```
@@ -20,7 +22,7 @@ Note that there are prerequisites for successful configuration:
 You can use the generated `*.yml` files as your nodes' and `anytype-heart`'s configurations.
 
 ### Example
-![Interactive CLI demo](assets/any-sync-network-example.gif)
+![Interactive CLI demo](../assets/any-sync-network-example.gif)
 
 Configuring a network with three sync nodes and one file node.
 
@@ -39,4 +41,4 @@ Thank you for your desire to develop Anytype together!
 ---
 Made by Any — a Swiss association 🇨🇭
 
-Licensed under [MIT License](./LICENSE).
+Licensed under [MIT License](../LICENSE).
