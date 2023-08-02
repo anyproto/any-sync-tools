@@ -2,14 +2,13 @@
 
 ## `any-sync-network`
 
-Configuration builder for Any-Sync nodes.  
-[Documentation](https://github.com/anyproto/any-sync-tools/tree/main/any-sync-network)
-
+Configuration builder for Any-Sync nodes. 
+See the tool [`README`](https://github.com/anyproto/any-sync-tools/tree/main/any-sync-network) for more details.
 
 ## `any-sync-netcheck`
 
-Tool to debug network issues in anytype network.   
-[Documentation](https://github.com/anyproto/any-sync-tools/tree/main/any-sync-netcheck)
+Network issues debugger for any-sync networks.   
+See the tool [`README`](https://github.com/anyproto/any-sync-tools/tree/main/any-sync-netcheck) for more details.
 
 
 ## Contribution
