@@ -7,7 +7,7 @@ See the tool [`README`](any-sync-network/README.md) for more details.
 
 ## `any-sync-netcheck`
 
-Network issues debugger for any-sync networks.
+Network issues debugger for Any-Sync networks.
 See the tool [`README`](any-sync-netcheck/README.md) for more details.
 
 
