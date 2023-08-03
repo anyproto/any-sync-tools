@@ -11,9 +11,8 @@ else
 endif
 
 build:
-	@$(eval FLAGS := $$(shell PATH=$(PATH) govvv -flags -pkg github.com/anyproto/any-sync/app))
-	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -ldflags "$(FLAGS)" -o bin/any-sync-network$(BIN_SUFFUX) ./any-sync-network
-	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -ldflags "$(FLAGS)" -o bin/any-sync-netcheck$(BIN_SUFFUX) ./any-sync-netcheck
+	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -o bin/any-sync-network$(BIN_SUFFUX) ./any-sync-network
+	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -o bin/any-sync-netcheck$(BIN_SUFFUX) ./any-sync-netcheck
 
 deps:
 	go mod download
