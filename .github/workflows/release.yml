@@ -81,6 +81,9 @@ jobs:
         run: make build BUILD_GOOS=${{ matrix.os}} BUILD_GOARCH=${{ matrix.arch }}
       # }}
 
+      - name: test default config generation
+        run: ./bin/any-sync-network create --defaults
+
       - name: get release version
         id: release-version
         run: |
