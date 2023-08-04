@@ -21,6 +21,12 @@ Note that there are prerequisites for successful configuration:
 
 You can use the generated `*.yml` files as your nodes' and `anytype-heart`'s configurations.
 
+One can also use the CLI in a non interactive way by generating a default configuration using the defaults
+flag. This is useful for automating configuration generation.
+```
+any-sync-network create --defaults
+```
+
 ### Example
 ![Interactive CLI demo](../assets/any-sync-network-example.gif)
 

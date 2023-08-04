@@ -53,6 +53,7 @@ jobs:
 
       #- name: unit tests
       #  run: make test
+
       - name: test default config generation
         run: go run any-sync-network/main.go create --defaults
 
