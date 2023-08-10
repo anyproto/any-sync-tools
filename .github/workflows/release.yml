@@ -87,9 +87,13 @@ jobs:
           echo "$GITHUB_REF_NAME" | sed 's|^[a-zA-Z]\+|RELEASE_VERSION=|' >> $GITHUB_OUTPUT
 
       # create asset {{
-      - name: create archives
+      - name: create zip archive
+        if: matrix.os == 'windows'
         run: |
           zip --junk-paths ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip bin/*
+      - name: create tar archive
+        if: matrix.os != 'windows'
+        run: |
           tar \
             --create \
             --gzip \
@@ -132,6 +136,7 @@ jobs:
 
       # upload-release-asset {{
       - name: upload-release-asset zip
+        if: matrix.os == 'windows'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -142,6 +147,7 @@ jobs:
           asset_content_type: application/zip
 
       - name: upload-release-asset tgz
+        if: matrix.os != 'windows'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
