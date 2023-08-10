@@ -2,17 +2,15 @@ package gen
 
 import (
 	"github.com/anyproto/any-sync/accountservice"
-	"github.com/anyproto/any-sync/net"
 	"github.com/anyproto/any-sync/nodeconf"
 	"github.com/anyproto/any-sync/util/crypto"
 	"golang.org/x/exp/slices"
 )
 
 type NodeConfigInfo struct {
-	Config         any
-	DebugApiServer net.Config
-	Account        accountservice.Config
-	Nodes          nodeconf.Configuration
+	Config  any
+	Account accountservice.Config
+	Nodes   nodeconf.Configuration
 }
 
 type NodeParameters struct {
