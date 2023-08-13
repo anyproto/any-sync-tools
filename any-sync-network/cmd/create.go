@@ -42,6 +42,16 @@ type CoordinatorNodeConfig struct {
 	} `yaml:"spaceStatus"`
 }
 
+type ConsensusNodeConfig struct {
+	GeneralNodeConfig `yaml:".,inline"`
+	Mongo             struct {
+		Connect  string `yaml:"connect"`
+		Database string `yaml:"database"`
+		LogCollection string `yaml:"logCollection"`
+	} `yaml:"mongo"`
+	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
+}
+
 type SyncNodeConfig struct {
 	GeneralNodeConfig        `yaml:".,inline"`
 	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
@@ -148,26 +158,66 @@ var create = &cobra.Command{
 			},
 		}
 
-		answers := struct {
+		coordinatorAs := struct {
 			Address      string
 			MongoConnect string
 			MongoDB      string
 		}{}
 
-		err := survey.Ask(coordinatorQs, &answers)
+		err := survey.Ask(coordinatorQs, &coordinatorAs)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
 		coordinatorNode := defaultCoordinatorNode()
-		coordinatorNode.Yamux.ListenAddrs = append(coordinatorNode.Yamux.ListenAddrs, answers.Address)
-		coordinatorNode.Mongo.Connect = answers.MongoConnect
-		coordinatorNode.Mongo.Database = answers.MongoDB
+		coordinatorNode.Yamux.ListenAddrs = append(coordinatorNode.Yamux.ListenAddrs, coordinatorAs.Address)
+		coordinatorNode.Mongo.Connect = coordinatorAs.MongoConnect
+		coordinatorNode.Mongo.Database = coordinatorAs.MongoDB
 		coordinatorNode.Account = generateAccount()
 		coordinatorNode.Account.SigningKey, _ = crypto.EncodeKeyToString(netKey)
 
 		addToNetwork(coordinatorNode.GeneralNodeConfig, "coordinator")
+
+		// Create consensus node
+		fmt.Println("\nCreating consensus node...")
+
+		var consensusQs = []*survey.Question{
+			{
+				Name: "address",
+				Prompt: &survey.Input{
+					Message: "Any-Sync Consensus Node address",
+					Default: "127.0.0.1:4530",
+				},
+				Validate: survey.Required,
+			},
+			{
+				Name: "mongoDB",
+				Prompt: &survey.Input{
+					Message: "Any-Sync Consensus Mongo database name",
+					Default: "consensus",
+				},
+				Validate: survey.Required,
+			},
+		}
+
+		consensusAs := struct {
+			Address      string
+			MongoDB      string
+		}{}
+
+		err = survey.Ask(consensusQs, &consensusAs)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		consensusNode := defaultConsensusNode()
+		consensusNode.Yamux.ListenAddrs = append(consensusNode.Yamux.ListenAddrs, consensusAs.Address)
+		consensusNode.Mongo.Database = consensusAs.MongoDB
+		consensusNode.Account = generateAccount()
+
+		addToNetwork(consensusNode.GeneralNodeConfig, "consensus")
 
 		createSyncNode()
 
@@ -180,6 +230,9 @@ var create = &cobra.Command{
 
 		coordinatorNode.Network = network
 		createConfigFile(coordinatorNode, "coordinator")
+
+		consensusNode.Network = network
+		createConfigFile(consensusNode, "consensus")
 
 		for i, syncNode := range syncNodes {
 			syncNode.Network = network
@@ -425,6 +478,20 @@ func defaultCoordinatorNode() CoordinatorNodeConfig {
 			RunSeconds:         20,
 			DeletionPeriodDays: 1,
 		},
+	}
+}
+
+func defaultConsensusNode() ConsensusNodeConfig {
+	return ConsensusNodeConfig{
+		GeneralNodeConfig: defaultGeneralNode(),
+		Mongo: struct {
+			Connect  string "yaml:\"connect\""
+			Database string "yaml:\"database\""
+			LogCollection string "yaml:\"logCollection\""
+		}{
+			LogCollection: "log",
+		},
+		NetworkUpdateIntervalSec: 600,
 	}
 }
 
