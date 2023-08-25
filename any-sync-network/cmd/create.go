@@ -121,12 +121,16 @@ var create = &cobra.Command{
 		// Create coordinator node
 		fmt.Println("\nCreating coordinator node...")
 
+		var defaultCoordinatorAddress = "127.0.0.1:4830"
+		var defaultMongoAddress = "mongodb://localhost:27017"
+		var defaultMongoDatabase = "coordinator"
+
 		var coordinatorQs = []*survey.Question{
 			{
 				Name: "address",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Coordinator Node address",
-					Default: "127.0.0.1:4830",
+					Default: defaultCoordinatorAddress,
 				},
 				Validate: survey.Required,
 			},
@@ -134,7 +138,7 @@ var create = &cobra.Command{
 				Name: "mongoConnect",
 				Prompt: &survey.Input{
 					Message: "Mongo connect URI",
-					Default: "mongodb://localhost:27017",
+					Default: defaultMongoAddress,
 				},
 				Validate: survey.Required,
 			},
@@ -142,7 +146,7 @@ var create = &cobra.Command{
 				Name: "mongoDB",
 				Prompt: &survey.Input{
 					Message: "Mongo database name",
-					Default: "coordinator",
+					Default: defaultMongoDatabase,
 				},
 				Validate: survey.Required,
 			},
@@ -152,12 +156,18 @@ var create = &cobra.Command{
 			Address      string
 			MongoConnect string
 			MongoDB      string
-		}{}
+		}{
+			Address:      defaultCoordinatorAddress,
+			MongoConnect: defaultMongoAddress,
+			MongoDB:      defaultMongoDatabase,
+		}
 
-		err := survey.Ask(coordinatorQs, &answers)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
+		if !defaultsFlag {
+			err := survey.Ask(coordinatorQs, &answers)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		}
 
 		coordinatorNode := defaultCoordinatorNode()
@@ -212,12 +222,14 @@ var syncNodes = []SyncNodeConfig{}
 func createSyncNode() {
 	fmt.Println("\nCreating sync node...")
 
+	var defaultSyncNodeAddress = "127.0.0.1:" + syncNodePort
+
 	var syncQs = []*survey.Question{
 		{
 			Name: "address",
 			Prompt: &survey.Input{
 				Message: "Any-Sync Node address",
-				Default: "127.0.0.1:" + syncNodePort,
+				Default: defaultSyncNodeAddress,
 			},
 			Validate: survey.Required,
 		},
@@ -225,12 +237,16 @@ func createSyncNode() {
 
 	answers := struct {
 		Address string
-	}{}
+	}{
+		defaultSyncNodeAddress,
+	}
 
-	err := survey.Ask(syncQs, &answers)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
+	if !defaultsFlag {
+		err := survey.Ask(syncQs, &answers)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 	}
 
 	syncNode := defaultSyncNode()
@@ -252,12 +268,19 @@ var fileNodes = []FileNodeConfig{}
 func createFileNode() {
 	fmt.Println("\nCreating file node...")
 
+	var defaultFileNodeAddress = "127.0.0.1:" + fileNodePort
+	var defaultS3Region = "eu-central-1"
+	var defaultS3Profile = "default"
+	var defaultS3Bucket = "any-sync-files"
+	var defaultRedisURL = "redis://127.0.0.1:6379/?dial_timeout=3&db=1&read_timeout=6s&max_retries=2"
+	var defaultRedisCluster = "false"
+
 	var fileQs = []*survey.Question{
 		{
 			Name: "address",
 			Prompt: &survey.Input{
 				Message: "Any-Sync File Node address",
-				Default: "127.0.0.1:" + fileNodePort,
+				Default: defaultFileNodeAddress,
 			},
 			Validate: survey.Required,
 		},
@@ -273,7 +296,7 @@ func createFileNode() {
 			Name: "s3Region",
 			Prompt: &survey.Input{
 				Message: "S3 Region",
-				Default: "eu-central-1",
+				Default: defaultS3Region,
 			},
 			Validate: survey.Required,
 		},
@@ -281,7 +304,7 @@ func createFileNode() {
 			Name: "s3Profile",
 			Prompt: &survey.Input{
 				Message: "S3 Profile",
-				Default: "default",
+				Default: defaultS3Profile,
 			},
 			Validate: survey.Required,
 		},
@@ -289,7 +312,7 @@ func createFileNode() {
 			Name: "s3Bucket",
 			Prompt: &survey.Input{
 				Message: "S3 Bucket",
-				Default: "any-sync-files",
+				Default: defaultS3Bucket,
 			},
 			Validate: survey.Required,
 		},
@@ -297,7 +320,7 @@ func createFileNode() {
 			Name: "redisURL",
 			Prompt: &survey.Input{
 				Message: "Redis URL",
-				Default: "redis://127.0.0.1:6379/?dial_timeout=3&db=1&read_timeout=6s&max_retries=2",
+				Default: defaultRedisURL,
 			},
 			Validate: survey.Required,
 		},
@@ -306,7 +329,7 @@ func createFileNode() {
 			Prompt: &survey.Select{
 				Message: "Is your redis installation a cluster?",
 				Options: []string{"true", "false"},
-				Default: "false",
+				Default: defaultRedisCluster,
 			},
 			Validate: survey.Required,
 		},
@@ -320,12 +343,22 @@ func createFileNode() {
 		S3Bucket     string
 		RedisURL     string
 		RedisCluster string
-	}{}
+	}{
+		Address:      defaultFileNodeAddress,
+		S3Endpoint:   "",
+		S3Region:     defaultS3Region,
+		S3Profile:    defaultS3Profile,
+		S3Bucket:     defaultS3Bucket,
+		RedisURL:     defaultRedisURL,
+		RedisCluster: defaultRedisCluster,
+	}
 
-	err := survey.Ask(fileQs, &answers)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
+	if !defaultsFlag {
+		err := survey.Ask(fileQs, &answers)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 	}
 
 	fileNode := defaultFileNode()
@@ -355,17 +388,19 @@ func lastStepOptions() {
 		Default: "No, generate configs",
 	}
 
-	option := ""
-	survey.AskOne(prompt, &option, survey.WithValidator(survey.Required))
-	switch option {
-	case "Add sync-node":
-		createSyncNode()
-		lastStepOptions()
-	case "Add file-node":
-		createFileNode()
-		lastStepOptions()
-	default:
-		return
+	if !defaultsFlag {
+		option := ""
+		survey.AskOne(prompt, &option, survey.WithValidator(survey.Required))
+		switch option {
+		case "Add sync-node":
+			createSyncNode()
+			lastStepOptions()
+		case "Add file-node":
+			createFileNode()
+			lastStepOptions()
+		default:
+			return
+		}
 	}
 }
 
