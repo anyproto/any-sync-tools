@@ -11,6 +11,7 @@ import (
 	"github.com/anyproto/any-sync/net/secureservice/handshake"
 	"github.com/anyproto/any-sync/net/secureservice/handshake/handshakeproto"
 	"github.com/anyproto/any-sync/net/transport"
+	"github.com/anyproto/any-sync/net/transport/quic"
 	"github.com/anyproto/any-sync/net/transport/yamux"
 	"github.com/anyproto/any-sync/nodeconf"
 	"github.com/anyproto/any-sync/testutil/accounttest"
@@ -52,11 +53,16 @@ func main() {
 
 	var addrs = []string{"prod-any-sync-coordinator1.toolpad.org:443", "prod-any-sync-coordinator1.toolpad.org:1443"}
 	for _, addr := range addrs {
-		probe(a, addr)
+		probeYamux(a, addr)
+	}
+
+	var quicAddrs = []string{"prod-any-sync-coordinator1.toolpad.org:5430"}
+	for _, addr := range quicAddrs {
+		probeQuic(a, addr)
 	}
 }
 
-func probe(a *app.App, addr string) {
+func probeYamux(a *app.App, addr string) {
 	ss := a.MustComponent(secureservice.CName).(secureservice.SecureService)
 	l := log.With(zap.String("addr", addr))
 
@@ -125,15 +131,62 @@ func probe(a *app.App, addr string) {
 	l.Info("success", zap.Duration("dur", time.Since(st)))
 }
 
-func printDebugInfo() {
+func probeQuic(a *app.App, addr string) {
+	qs := a.MustComponent(quic.CName).(quic.Quic)
+	l := log.With(zap.String("addr", addr))
 
+	l.Debug("open QUIC conn")
+	st := time.Now()
+	mc, err := qs.Dial(ctx, addr)
+	if err != nil {
+		l.Warn("open QUIC conn error", zap.Error(err), zap.Duration("dur", time.Since(st)))
+		return
+	} else {
+		l.Debug("QUIC conn established", zap.Duration("dur", time.Since(st)))
+		l = l.With(zap.String("ip", mc.Addr()))
+	}
+	defer mc.Close()
+
+	l.Debug("open sub connection")
+	scst := time.Now()
+	sc, err := mc.Open(ctx)
+	if err != nil {
+		l.Warn("open sub connection error", zap.Error(err), zap.Duration("dur", time.Since(scst)))
+		return
+	} else {
+		l.Debug("open sub conn success", zap.Duration("dur", time.Since(scst)), zap.Duration("total", time.Since(st)))
+		defer sc.Close()
+	}
+
+	l.Debug("start proto handshake")
+	phst := time.Now()
+	if err = handshake.OutgoingProtoHandshake(ctx, sc, handshakeproto.ProtoType_DRPC); err != nil {
+		l.Warn("proto handshake error", zap.Duration("dur", time.Since(phst)), zap.Error(err))
+		return
+	} else {
+		l.Debug("proto handshake success", zap.Duration("dur", time.Since(phst)), zap.Duration("total", time.Since(st)))
+	}
+
+	l.Debug("start configuration request")
+	rst := time.Now()
+	resp, err := coordinatorproto.NewDRPCCoordinatorClient(drpcconn.New(sc)).NetworkConfiguration(ctx, &coordinatorproto.NetworkConfigurationRequest{})
+	if err != nil {
+		l.Warn("configuration request error", zap.Error(err), zap.Duration("dur", time.Since(rst)))
+		return
+	} else {
+		l.Debug("configuration request success", zap.Duration("dur", time.Since(rst)), zap.Duration("total", time.Since(st)), zap.String("nid", resp.GetNetworkId()))
+	}
+	l.Info("success", zap.Duration("dur", time.Since(st)))
 }
 
 func bootstrap(a *app.App) {
+	q := quic.New()
 	a.Register(&config{}).
 		Register(&nodeConf{}).
+		Register(q).
 		Register(&accounttest.AccountTestService{}).
 		Register(secureservice.New())
+	q.SetAccepter(new(accepter))
 }
 
 type config struct {
@@ -144,6 +197,14 @@ func (c config) Init(a *app.App) error { return nil }
 
 func (c config) GetYamux() yamux.Config {
 	return yamux.Config{
+		WriteTimeoutSec:    60,
+		DialTimeoutSec:     60,
+		KeepAlivePeriodSec: 120,
+	}
+}
+
+func (c config) GetQuic() quic.Config {
+	return quic.Config{
 		WriteTimeoutSec:    60,
 		DialTimeoutSec:     60,
 		KeepAlivePeriodSec: 120,
