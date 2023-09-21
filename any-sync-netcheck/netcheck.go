@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"storj.io/drpc/drpcconn"
+	"strings"
 	"time"
 )
 
@@ -28,7 +29,16 @@ var ctx = context.Background()
 
 var log = logger.NewNamed("netcheck")
 
-var verbose = flag.Bool("v", false, "verbose logs")
+var defaultAddrs = `
+yamux://prod-any-sync-coordinator1.toolpad.org:443,
+yamux://prod-any-sync-coordinator1.toolpad.org:1443,
+quic://prod-any-sync-coordinator1.toolpad.org:5430
+`
+
+var (
+	verbose = flag.Bool("v", false, "verbose logs")
+	addrs   = flag.String("addrs", defaultAddrs, "comma separated list of addrs")
+)
 
 func main() {
 	flag.Parse()
@@ -51,14 +61,17 @@ func main() {
 		panic(err)
 	}
 
-	var addrs = []string{"prod-any-sync-coordinator1.toolpad.org:443", "prod-any-sync-coordinator1.toolpad.org:1443"}
-	for _, addr := range addrs {
-		probeYamux(a, addr)
-	}
+	checkAddrs := strings.Split(*addrs, ",")
 
-	var quicAddrs = []string{"prod-any-sync-coordinator1.toolpad.org:5430"}
-	for _, addr := range quicAddrs {
-		probeQuic(a, addr)
+	for _, addr := range checkAddrs {
+		addr = strings.TrimSpace(addr)
+		if strings.HasPrefix(addr, "yamux://") {
+			probeYamux(a, addr[8:])
+		} else if strings.HasPrefix(addr, "quic://") {
+			probeQuic(a, addr[7:])
+		} else {
+			log.Warn("unexpected address scheme", zap.String("addr", addr))
+		}
 	}
 }
 
