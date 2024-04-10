@@ -45,6 +45,11 @@ type CoordinatorNodeConfig struct {
 		RunSeconds         int `yaml:"runSeconds"`
 		DeletionPeriodDays int `yaml:"deletionPeriodDays"`
 	} `yaml:"spaceStatus"`
+	DefaultLimits struct {
+		SpaceMembersRead  int `yaml:"spaceMembersRead"`
+		SpaceMembersWrite int `yaml:"spaceMembersWrite"`
+		SharedSpacesLimit int `yaml:"sharedSpacesLimit"`
+	} `yaml:"defaultLimits"`
 }
 
 type ConsensusNodeConfig struct {
@@ -68,9 +73,6 @@ type SyncNodeConfig struct {
 		Path string `yaml:"path"`
 	} `yaml:"storage"`
 	NodeSync struct {
-		HotSync struct {
-			SimultaneousRequests int `yaml:"simultaneousRequests"`
-		} `yaml:"hotSync"`
 		SyncOnStart       bool `yaml:"syncOnStart"`
 		PeriodicSyncHours int  `yaml:"periodicSyncHours"`
 	} `yaml:"nodeSync"`
@@ -80,11 +82,15 @@ type SyncNodeConfig struct {
 		NamedLevels  struct {
 		} `yaml:"namedLevels"`
 	} `yaml:"log"`
+	ApiServer struct {
+		ListenAddr string `yaml:"listenAddr"`
+	} `yaml:"apiServer"`
 }
 
 type FileNodeConfig struct {
 	GeneralNodeConfig        `yaml:".,inline"`
 	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
+	DefaultLimit             int `yaml:"defaultLimit"`
 	S3Store                  struct {
 		Endpoint   string `yaml:"endpoint,omitempty"`
 		Region     string `yaml:"region"`
@@ -289,6 +295,11 @@ var create = &cobra.Command{
 
 		createConfigFile(network.HeartConfig, "heart")
 
+		networkWrapper := map[string]interface{}{
+			"network": network.HeartConfig,
+		}
+		createConfigFile(networkWrapper, "network")
+
 		fmt.Println("Done!")
 	},
 }
@@ -440,7 +451,7 @@ func createFileNode() {
 			Name: "redisURL",
 			Prompt: &survey.Input{
 				Message: "Redis URL",
-				Default: "redis://127.0.0.1:6379/?dial_timeout=3&db=1&read_timeout=6s&max_retries=2",
+				Default: "redis://127.0.0.1:6379/?dial_timeout=3&read_timeout=6s",
 			},
 			Validate: survey.Required,
 		},
@@ -564,7 +575,7 @@ func defaultGeneralNode() GeneralNodeConfig {
 			WriteTimeoutSec: 10,
 			DialTimeoutSec:  10,
 		},
-		NetworkStorePath: ".",
+		NetworkStorePath: "/networkStore",
 	}
 }
 
@@ -581,6 +592,15 @@ func defaultCoordinatorNode() CoordinatorNodeConfig {
 		}{
 			RunSeconds:         20,
 			DeletionPeriodDays: 1,
+		},
+		DefaultLimits: struct {
+			SpaceMembersRead  int "yaml:\"spaceMembersRead\""
+			SpaceMembersWrite int "yaml:\"spaceMembersWrite\""
+			SharedSpacesLimit int "yaml:\"sharedSpacesLimit\""
+		}{
+			SpaceMembersRead:  1000,
+			SpaceMembersWrite: 1000,
+			SharedSpacesLimit: 1000,
 		},
 	}
 }
@@ -616,17 +636,9 @@ func defaultSyncNode() SyncNodeConfig {
 			Path: "db",
 		},
 		NodeSync: struct {
-			HotSync struct {
-				SimultaneousRequests int "yaml:\"simultaneousRequests\""
-			} "yaml:\"hotSync\""
 			SyncOnStart       bool "yaml:\"syncOnStart\""
 			PeriodicSyncHours int  "yaml:\"periodicSyncHours\""
 		}{
-			HotSync: struct {
-				SimultaneousRequests int "yaml:\"simultaneousRequests\""
-			}{
-				SimultaneousRequests: 400,
-			},
 			SyncOnStart:       true,
 			PeriodicSyncHours: 2,
 		},
@@ -639,6 +651,11 @@ func defaultSyncNode() SyncNodeConfig {
 			DefaultLevel: "",
 			NamedLevels:  struct{}{},
 		},
+		ApiServer: struct {
+			ListenAddr string "yaml:\"listenAddr\""
+		}{
+			ListenAddr: "0.0.0.0:8080",
+		},
 	}
 }
 
@@ -646,6 +663,7 @@ func defaultFileNode() FileNodeConfig {
 	return FileNodeConfig{
 		GeneralNodeConfig:        defaultGeneralNode(),
 		NetworkUpdateIntervalSec: 600,
+		DefaultLimit:             1073741824,
 		S3Store: struct {
 			Endpoint   string "yaml:\"endpoint,omitempty\""
 			Region     string "yaml:\"region\""
