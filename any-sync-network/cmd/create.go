@@ -19,7 +19,6 @@ type GeneralNodeConfig struct {
 	Drpc    struct {
 		Stream struct {
 			MaxMsgSizeMb int `yaml:"maxMsgSizeMb"`
-			TimeoutMilliseconds int `yaml:"timeoutMilliseconds"`
 		} `yaml:"stream"`
 	} `yaml:"drpc"`
 	Yamux struct {
@@ -41,8 +40,6 @@ type CoordinatorNodeConfig struct {
 	Mongo             struct {
 		Connect  string `yaml:"connect"`
 		Database string `yaml:"database"`
-		Log  string `yaml:"log"`
-		Spaces string `yaml:"space"`
 	} `yaml:"mongo"`
 	SpaceStatus struct {
 		RunSeconds         int `yaml:"runSeconds"`
@@ -554,15 +551,12 @@ func defaultGeneralNode() GeneralNodeConfig {
 		Drpc: struct {
 			Stream struct {
 				MaxMsgSizeMb int "yaml:\"maxMsgSizeMb\""
-				TimeoutMilliseconds int "yaml:\"timeoutMilliseconds\""
 			} "yaml:\"stream\""
 		}{
 			Stream: struct {
 				MaxMsgSizeMb int "yaml:\"maxMsgSizeMb\""
-				TimeoutMilliseconds int "yaml:\"timeoutMilliseconds\""
 			}{
 				MaxMsgSizeMb: 256,
-				TimeoutMilliseconds: 1000,
 			},
 		},
 		Yamux: struct {
@@ -591,12 +585,7 @@ func defaultCoordinatorNode() CoordinatorNodeConfig {
 		Mongo: struct {
 			Connect  string "yaml:\"connect\""
 			Database string "yaml:\"database\""
-			Log      string "yaml:\"log\""
-			Spaces   string "yaml:\"space\""
-		}{
-			Log: "log",
-			Spaces: "spaces",
-		},
+		}{},
 		SpaceStatus: struct {
 			RunSeconds         int "yaml:\"runSeconds\""
 			DeletionPeriodDays int "yaml:\"deletionPeriodDays\""
