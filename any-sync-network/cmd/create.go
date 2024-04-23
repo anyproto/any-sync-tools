@@ -245,6 +245,14 @@ var create = &cobra.Command{
 				},
 				Validate: survey.Required,
 			},
+			{
+				Name: "mongoConnect",
+				Prompt: &survey.Input{
+					Message: "Mongo connect URI",
+					Default: "mongodb://localhost:27017",
+				},
+				Validate: survey.Required,
+			},
 		}
 
 		consensusAs := struct {
@@ -252,6 +260,7 @@ var create = &cobra.Command{
 			YamuxPort    string
 			QuicPort     string
 			MongoDB      string
+			MongoConnect string
 		}{}
 
 		err = survey.Ask(consensusQs, &consensusAs)
@@ -264,6 +273,7 @@ var create = &cobra.Command{
 		consensusNode.Yamux.ListenAddrs = append(consensusNode.Yamux.ListenAddrs, consensusAs.Address + ":" + consensusAs.YamuxPort)
 		consensusNode.Quic.ListenAddrs = append(consensusNode.Quic.ListenAddrs, consensusAs.Address + ":" + consensusAs.QuicPort)
 		consensusNode.Mongo.Database = consensusAs.MongoDB
+		consensusNode.Mongo.Connect = consensusAs.MongoConnect
 		consensusNode.Account = generateAccount()
 
 		addToNetwork(consensusNode.GeneralNodeConfig, "consensus")
