@@ -30,9 +30,13 @@ var ctx = context.Background()
 var log = logger.NewNamed("netcheck")
 
 var defaultAddrs = `
+yamux://prod-any-sync-coordinator1.anyclub.org:443,
+yamux://prod-any-sync-coordinator1.anyclub.org:1443,
 yamux://prod-any-sync-coordinator1.toolpad.org:443,
 yamux://prod-any-sync-coordinator1.toolpad.org:1443,
-quic://prod-any-sync-coordinator1.toolpad.org:5430
+yamux://prod-any-sync-coordinator1.anytype.io:443,
+yamux://prod-any-sync-coordinator1.anytype.io:1443,
+quic://prod-any-sync-coordinator1.anyclub.org:5430
 `
 
 var (
@@ -257,6 +261,14 @@ func (n nodeConf) ConsensusPeers() []string {
 }
 
 func (n nodeConf) CoordinatorPeers() []string {
+	return nil
+}
+
+func (n nodeConf) NamingNodePeers() []string {
+	return nil
+}
+
+func (n nodeConf) PaymentProcessingNodePeers() []string {
 	return nil
 }
 
