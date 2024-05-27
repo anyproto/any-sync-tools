@@ -23,30 +23,76 @@ import (
 	"storj.io/drpc/drpcconn"
 	"strings"
 	"time"
+	"os"
+	"gopkg.in/yaml.v3"
 )
+
+type ConfigFile struct {
+	Id        string `yaml:"id"`
+	NetworkId string `yaml:"networkId"`
+	Nodes     []Node `yaml:"nodes"`
+}
+
+type Node struct {
+	Addresses []string `yaml:"addresses"`
+	PeerId    string   `yaml:"peerId"`
+	Types     []string `yaml:"types"`
+}
 
 var ctx = context.Background()
 
 var log = logger.NewNamed("netcheck")
 
 var defaultAddrs = `
+yamux://prod-any-sync-coordinator1.anyclub.org:443,
+yamux://prod-any-sync-coordinator1.anyclub.org:1443,
 yamux://prod-any-sync-coordinator1.toolpad.org:443,
 yamux://prod-any-sync-coordinator1.toolpad.org:1443,
-quic://prod-any-sync-coordinator1.toolpad.org:5430
+yamux://prod-any-sync-coordinator1.anytype.io:443,
+yamux://prod-any-sync-coordinator1.anytype.io:1443,
+quic://prod-any-sync-coordinator1.anyclub.org:5430
 `
 
 var (
-	verbose = flag.Bool("v", false, "verbose logs")
-	addrs   = flag.String("addrs", defaultAddrs, "comma separated list of addrs")
+	verbose   = flag.Bool("v", false, "verbose logs")
+	addrs     = flag.String("addrs", defaultAddrs, "comma separated list of addrs")
+	clientYml = flag.String("c", "", "path to client.yml file")
 )
 
 func main() {
 	flag.Parse()
 
+	logger.SetNamedLevels(logger.LevelsFromStr("*=INFO"))
 	if *verbose {
 		logger.SetNamedLevels(logger.LevelsFromStr("*=DEBUG"))
+	}
+
+	var checkAddrs []string
+	if *clientYml != "" {
+		file, err := os.ReadFile(*clientYml)
+		if err != nil {
+			log.Fatal("cannot read client.yml", zap.Error(err))
+		}
+
+		var configFile ConfigFile
+		if err := yaml.Unmarshal(file, &configFile); err != nil {
+			log.Fatal("cannot unmarshal client.yml", zap.Error(err))
+		}
+
+		for _, node := range configFile.Nodes {
+			for _, t := range node.Types {
+				if t == "coordinator" {
+					for _, address := range node.Addresses {
+						if !strings.HasPrefix(address, "quic://") {
+							address = "yamux://" + address
+						}
+						checkAddrs = append(checkAddrs, address)
+					}
+				}
+			}
+		}
 	} else {
-		logger.SetNamedLevels(logger.LevelsFromStr("*=INFO"))
+		checkAddrs = strings.Split(*addrs, ",")
 	}
 
 	info, err := goInfo.GetInfo()
@@ -55,25 +101,26 @@ func main() {
 	} else {
 		info.VarDump()
 	}
+
 	a := new(app.App)
 	bootstrap(a)
 	if err := a.Start(ctx); err != nil {
 		panic(err)
 	}
 
-	checkAddrs := strings.Split(*addrs, ",")
-
 	for _, addr := range checkAddrs {
 		addr = strings.TrimSpace(addr)
-		if strings.HasPrefix(addr, "yamux://") {
+		switch {
+		case strings.HasPrefix(addr, "yamux://"):
 			probeYamux(a, addr[8:])
-		} else if strings.HasPrefix(addr, "quic://") {
+		case strings.HasPrefix(addr, "quic://"):
 			probeQuic(a, addr[7:])
-		} else {
+		default:
 			log.Warn("unexpected address scheme", zap.String("addr", addr))
 		}
 	}
 }
+
 
 func probeYamux(a *app.App, addr string) {
 	ss := a.MustComponent(secureservice.CName).(secureservice.SecureService)
@@ -257,6 +304,14 @@ func (n nodeConf) ConsensusPeers() []string {
 }
 
 func (n nodeConf) CoordinatorPeers() []string {
+	return nil
+}
+
+func (n nodeConf) NamingNodePeers() []string {
+	return nil
+}
+
+func (n nodeConf) PaymentProcessingNodePeers() []string {
 	return nil
 }
 
