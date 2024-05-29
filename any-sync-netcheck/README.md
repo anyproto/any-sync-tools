@@ -12,9 +12,11 @@ You can download the binary release here: https://github.com/anyproto/any-sync-t
 ```go install github.com/anyproto/any-sync-tools/any-sync-netcheck@latest```
 
 ## Usage
-```any-sync-netcheck```  
-```any-sync-netcheck -v```  for a verbose output
-```any-sync-netcheck -c <path_to_client.yml>```  read and check coordinators from the client.yml file
+```any-sync-netcheck```
+
+```any-sync-netcheck -v``` for a verbose output
+
+```any-sync-netcheck -c <path_to_client.yml>``` read and check coordinators from the client.yml file
 
 ## Contribution
 Thank you for your desire to develop Anytype together!
