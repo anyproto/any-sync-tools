@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"time"
+	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/anyproto/any-sync/accountservice"
@@ -92,11 +92,13 @@ type FileNodeConfig struct {
 	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 	DefaultLimit             int `yaml:"defaultLimit"`
 	S3Store                  struct {
-		Endpoint   string `yaml:"endpoint,omitempty"`
-		Region     string `yaml:"region"`
-		Profile    string `yaml:"profile"`
-		Bucket     string `yaml:"bucket"`
-		MaxThreads int    `yaml:"maxThreads"`
+		Endpoint       string `yaml:"endpoint,omitempty"`
+		Bucket         string `yaml:"bucket"`
+		IndexBucket    string `yaml:"indexBucket"`
+		Region         string `yaml:"region"`
+		Profile        string `yaml:"profile"`
+		MaxThreads     int    `yaml:"maxThreads"`
+		ForcePathStyle bool   `yaml:"forcePathStyle"`
 	} `yaml:"s3Store"`
 	Redis struct {
 		IsCluster bool   `yaml:"isCluster"`
@@ -118,8 +120,74 @@ type HeartConfig struct {
 type Network struct {
 	ID           string `yaml:"id"`
 	HeartConfig  `yaml:".,inline"`
-	CreationTime time.Time `yaml:"creationTime"`
 }
+
+type DefaultConfig struct {
+	ExternalAddr []string `yaml:"external-addresses"`
+
+	AnySyncCoordinator struct {
+		  ListenAddr    string `yaml:"listen"`
+			YamuxPort     int `yaml:"yamuxPort"`
+			QuicPort      int `yaml:"quicPort"`
+			Mongo         struct {
+					Connect  string `yaml:"connect"`
+					Database string `yaml:"database"`
+			} `yaml:"mongo"`
+			DefaultLimits struct {
+					SpaceMembersRead  int `yaml:"spaceMembersRead"`
+					SpaceMembersWrite int `yaml:"spaceMembersWrite"`
+					SharedSpacesLimit int `yaml:"sharedSpacesLimit"`
+			} `yaml:"defaultLimits"`
+	} `yaml:"any-sync-coordinator"`
+
+	AnySyncConsensusNode struct {
+		  ListenAddr    string `yaml:"listen"`
+			YamuxPort int `yaml:"yamuxPort"`
+			QuicPort  int `yaml:"quicPort"`
+			Mongo     struct {
+					Connect  string `yaml:"connect"`
+					Database string `yaml:"database"`
+			} `yaml:"mongo"`
+	} `yaml:"any-sync-consensusnode"`
+
+	AnySyncFilenode struct {
+		  ListenAddr    string `yaml:"listen"`
+			YamuxPort int `yaml:"yamuxPort"`
+			QuicPort  int `yaml:"quicPort"`
+			S3Store   struct {
+					Endpoint       string `yaml:"endpoint"`
+					Bucket         string `yaml:"bucket"`
+					IndexBucket    string `yaml:"indexBucket"`
+					Region         string `yaml:"region"`
+					Profile        string `yaml:"profile"`
+					ForcePathStyle bool   `yaml:"forcePathStyle"`
+			} `yaml:"s3Store"`
+			Redis struct {
+					URL string `yaml:"url"`
+			} `yaml:"redis"`
+			DefaultLimit int `yaml:"defaultLimit"`
+	} `yaml:"any-sync-filenode"`
+
+	AnySyncNode struct {
+		  ListenAddr []string `yaml:"listen"`
+			YamuxPort  int `yaml:"yamuxPort"`
+			QuicPort   int `yaml:"quicPort"`
+	} `yaml:"any-sync-node"`
+}
+
+func loadDefaultTemplate() {
+	data, err := os.ReadFile(templatePath)
+	if err != nil {
+		panic(err)
+	}
+
+	err = yaml.Unmarshal(data, &cfg)
+	if err != nil {
+		panic(err)
+	}
+}
+
+var cfg DefaultConfig
 
 var create = &cobra.Command{
 	Use:   "create",
@@ -135,19 +203,27 @@ var create = &cobra.Command{
 		}
 		network.ID = bson.NewObjectId().Hex()
 		network.NetworkID = netKey.GetPublic().Network()
-		network.CreationTime = time.Now()
 
 		fmt.Println("\033[1m  Network ID:\033[0m", network.NetworkID)
 
+		loadDefaultTemplate()
+
 		// Create coordinator node
 		fmt.Println("\nCreating coordinator node...")
+
+		var defaultCoordinatorAddress = cfg.AnySyncCoordinator.ListenAddr
+		var defaultCoordinatorYamuxPort = strconv.Itoa(cfg.AnySyncCoordinator.YamuxPort)
+		var defaultCoordinatorQuicPort = strconv.Itoa(cfg.AnySyncCoordinator.QuicPort)
+		var	defaultCoordinatorMongoConnect = cfg.AnySyncCoordinator.Mongo.Connect
+		var	defaultCoordinatorMongoDb = cfg.AnySyncCoordinator.Mongo.Database
 
 		var coordinatorQs = []*survey.Question{
 			{
 				Name: "address",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Coordinator Node address (without port)",
-					Default: "127.0.0.1",
+					Default: defaultCoordinatorAddress,
+
 				},
 				Validate: survey.Required,
 			},
@@ -155,7 +231,7 @@ var create = &cobra.Command{
 				Name: "yamuxPort",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Coordinator Node Yamux (TCP) port",
-					Default: "4830",
+					Default: defaultCoordinatorYamuxPort,
 				},
 				Validate: survey.Required,
 			},
@@ -163,7 +239,7 @@ var create = &cobra.Command{
 				Name: "quicPort",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Coordinator Node Quic (UDP) port",
-					Default: "5830",
+					Default: defaultCoordinatorQuicPort,
 				},
 				Validate: survey.Required,
 			},
@@ -171,7 +247,7 @@ var create = &cobra.Command{
 				Name: "mongoConnect",
 				Prompt: &survey.Input{
 					Message: "Mongo connect URI",
-					Default: "mongodb://localhost:27017",
+					Default: defaultCoordinatorMongoConnect,
 				},
 				Validate: survey.Required,
 			},
@@ -179,7 +255,7 @@ var create = &cobra.Command{
 				Name: "mongoDB",
 				Prompt: &survey.Input{
 					Message: "Mongo database name",
-					Default: "coordinator",
+					Default: defaultCoordinatorMongoDb,
 				},
 				Validate: survey.Required,
 			},
@@ -191,17 +267,25 @@ var create = &cobra.Command{
 			QuicPort     string
 			MongoConnect string
 			MongoDB      string
-		}{}
+		}{
+			Address:      defaultCoordinatorAddress,
+			YamuxPort:   	defaultCoordinatorYamuxPort,
+			QuicPort:   	defaultCoordinatorQuicPort,
+			MongoConnect:	defaultCoordinatorMongoConnect,
+			MongoDB:      defaultCoordinatorMongoDb,
+		}
 
-		err := survey.Ask(coordinatorQs, &coordinatorAs)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
+		if !autoFlag {
+			err := survey.Ask(coordinatorQs, &coordinatorAs)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		}
 
 		coordinatorNode := defaultCoordinatorNode()
-		coordinatorNode.Yamux.ListenAddrs = append(coordinatorNode.Yamux.ListenAddrs, coordinatorAs.Address + ":" + coordinatorAs.YamuxPort)
-		coordinatorNode.Quic.ListenAddrs = append(coordinatorNode.Quic.ListenAddrs, coordinatorAs.Address + ":" + coordinatorAs.QuicPort)
+		coordinatorNode.Yamux.ListenAddrs = append(coordinatorNode.Yamux.ListenAddrs, coordinatorAs.Address+":"+coordinatorAs.YamuxPort)
+		coordinatorNode.Quic.ListenAddrs = append(coordinatorNode.Quic.ListenAddrs, coordinatorAs.Address+":"+coordinatorAs.QuicPort)
 		coordinatorNode.Mongo.Connect = coordinatorAs.MongoConnect
 		coordinatorNode.Mongo.Database = coordinatorAs.MongoDB
 		coordinatorNode.Account = generateAccount()
@@ -212,12 +296,17 @@ var create = &cobra.Command{
 		// Create consensus node
 		fmt.Println("\nCreating consensus node...")
 
+		var defaultConsensusAddress = cfg.AnySyncConsensusNode.ListenAddr
+		var defaultConsensusYamuxPort = strconv.Itoa(cfg.AnySyncConsensusNode.YamuxPort)
+		var defaultConsensusQuicPort = strconv.Itoa(cfg.AnySyncConsensusNode.QuicPort)
+		var defaultConsensusMongoDB = cfg.AnySyncConsensusNode.Mongo.Database
+
 		var consensusQs = []*survey.Question{
 			{
 				Name: "address",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Consensus Node address (without port)",
-					Default: "127.0.0.1",
+					Default: defaultConsensusAddress,
 				},
 				Validate: survey.Required,
 			},
@@ -225,7 +314,7 @@ var create = &cobra.Command{
 				Name: "yamuxPort",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Consensus Node Yamux (TCP) port",
-					Default: "4530",
+					Default: defaultConsensusYamuxPort,
 				},
 				Validate: survey.Required,
 			},
@@ -233,7 +322,7 @@ var create = &cobra.Command{
 				Name: "quicPort",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Consensus Node Quic (UDP) port",
-					Default: "5530",
+					Default: defaultConsensusQuicPort,
 				},
 				Validate: survey.Required,
 			},
@@ -241,45 +330,49 @@ var create = &cobra.Command{
 				Name: "mongoDB",
 				Prompt: &survey.Input{
 					Message: "Any-Sync Consensus Mongo database name",
-					Default: "consensus",
-				},
-				Validate: survey.Required,
-			},
-			{
-				Name: "mongoConnect",
-				Prompt: &survey.Input{
-					Message: "Mongo connect URI",
-					Default: "mongodb://localhost:27017",
+					Default: defaultConsensusMongoDB,
 				},
 				Validate: survey.Required,
 			},
 		}
 
 		consensusAs := struct {
-			Address      string
-			YamuxPort    string
-			QuicPort     string
-			MongoDB      string
-			MongoConnect string
-		}{}
+			Address   string
+			YamuxPort string
+			QuicPort  string
+			MongoDB   string
+		}{
+			Address:   defaultConsensusAddress,
+			YamuxPort: defaultConsensusYamuxPort,
+			QuicPort:  defaultConsensusQuicPort,
+			MongoDB:   defaultConsensusMongoDB,
+		}
 
-		err = survey.Ask(consensusQs, &consensusAs)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
+		if !autoFlag {
+			err := survey.Ask(consensusQs, &consensusAs)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		}
 
 		consensusNode := defaultConsensusNode()
 		consensusNode.Yamux.ListenAddrs = append(consensusNode.Yamux.ListenAddrs, consensusAs.Address + ":" + consensusAs.YamuxPort)
 		consensusNode.Quic.ListenAddrs = append(consensusNode.Quic.ListenAddrs, consensusAs.Address + ":" + consensusAs.QuicPort)
+		consensusNode.Mongo.Connect = cfg.AnySyncConsensusNode.Mongo.Connect
 		consensusNode.Mongo.Database = consensusAs.MongoDB
-		consensusNode.Mongo.Connect = consensusAs.MongoConnect
 		consensusNode.Account = generateAccount()
 
 		addToNetwork(consensusNode.GeneralNodeConfig, "consensus")
 
-		createSyncNode()
-
+		listenCount := len(cfg.AnySyncNode.ListenAddr)
+		if !autoFlag {
+			createSyncNode(0)
+		} else {
+			for node := 0; node < listenCount; node++ {
+				createSyncNode(node)
+			}
+		}
 		createFileNode()
 
 		lastStepOptions()
@@ -288,27 +381,27 @@ var create = &cobra.Command{
 		fmt.Println("\nCreating config file...")
 
 		coordinatorNode.Network = network
-		createConfigFile(coordinatorNode, "coordinator")
+		createConfigFile(coordinatorNode, "etc/any-sync-coordinator/config")
 
 		consensusNode.Network = network
-		createConfigFile(consensusNode, "consensus")
+		createConfigFile(consensusNode, "etc/any-sync-consensusnode/config")
 
 		for i, syncNode := range syncNodes {
 			syncNode.Network = network
-			createConfigFile(syncNode, "sync_"+strconv.Itoa(i+1))
+			createConfigFile(syncNode, "etc/any-sync-node-"+strconv.Itoa(i+1)+"/config")
 		}
 
 		for i, fileNode := range fileNodes {
 			fileNode.Network = network
-			createConfigFile(fileNode, "file_"+strconv.Itoa(i+1))
+			if i == 0 {
+				createConfigFile(fileNode, "etc/any-sync-filenode/config")
+			} else {
+				createConfigFile(fileNode, "etc/any-sync-filenode-"+strconv.Itoa(i+1)+"/config")
+			}
 		}
 
-		createConfigFile(network.HeartConfig, "heart")
-
-		networkWrapper := map[string]interface{}{
-			"network": network.HeartConfig,
-		}
-		createConfigFile(networkWrapper, "network")
+		createConfigFile(network.HeartConfig, "etc/client") // to import to client app
+		createConfigFile(network.HeartConfig, "etc/any-sync-coordinator/network") // to any-sync-confapply tool
 
 		fmt.Println("Done!")
 	},
@@ -318,11 +411,33 @@ var network = Network{}
 
 func addToNetwork(node GeneralNodeConfig, nodeType string) {
 	addresses := []string{}
+	yamuxPort := 0
+	quicPort := 0
+
+	switch nodeType {
+	case "coordinator":
+		yamuxPort = cfg.AnySyncCoordinator.YamuxPort
+		quicPort = cfg.AnySyncCoordinator.QuicPort
+	case "consensus":
+		yamuxPort = cfg.AnySyncConsensusNode.YamuxPort
+		quicPort = cfg.AnySyncConsensusNode.QuicPort
+	case "file":
+		yamuxPort = cfg.AnySyncFilenode.YamuxPort
+		quicPort = cfg.AnySyncFilenode.QuicPort
+	case "tree":
+		yamuxPort = cfg.AnySyncNode.YamuxPort
+		quicPort = cfg.AnySyncNode.QuicPort
+	}
+
 	for _, addr := range node.Yamux.ListenAddrs {
-		addresses = append(addresses, "yamux://"+addr)
+		addresses = append(addresses, addr)
 	}
 	for _, addr := range node.Quic.ListenAddrs {
 		addresses = append(addresses, "quic://"+addr)
+	}
+	for _, extAddr := range cfg.ExternalAddr {
+		addresses = append(addresses, extAddr+":"+strconv.Itoa(yamuxPort))
+		addresses = append(addresses, "quic://"+extAddr+":"+strconv.Itoa(quicPort))
 	}
 	network.Nodes = append(network.Nodes, Node{
 		PeerID:    node.Account.PeerId,
@@ -331,11 +446,13 @@ func addToNetwork(node GeneralNodeConfig, nodeType string) {
 	})
 }
 
-var syncNodeYamuxPort = "4430"
-var syncNodeQuicPort = "5430"
 var syncNodes = []SyncNodeConfig{}
 
-func createSyncNode() {
+func createSyncNode(index int) {
+	var defaultSyncNodeAddress = cfg.AnySyncNode.ListenAddr[index]
+	var defaultSyncNodeYamuxPort = strconv.Itoa(cfg.AnySyncNode.YamuxPort)
+	var defaultSyncNodeQuicPort = strconv.Itoa(cfg.AnySyncNode.QuicPort)
+
 	fmt.Println("\nCreating sync node...")
 
 	var syncQs = []*survey.Question{
@@ -343,7 +460,7 @@ func createSyncNode() {
 			Name: "address",
 			Prompt: &survey.Input{
 				Message: "Any-Sync Node address (without port)",
-				Default: "127.0.0.1",
+				Default: defaultSyncNodeAddress,
 			},
 			Validate: survey.Required,
 		},
@@ -351,7 +468,7 @@ func createSyncNode() {
 			Name: "yamuxPort",
 			Prompt: &survey.Input{
 				Message: "Any-Sync Node Yamux (TCP) port",
-				Default:  syncNodeYamuxPort,
+				Default: defaultSyncNodeYamuxPort,
 			},
 			Validate: survey.Required,
 		},
@@ -359,46 +476,56 @@ func createSyncNode() {
 			Name: "quicPort",
 			Prompt: &survey.Input{
 				Message: "Any-Sync Node Quic (UDP) port",
-				Default:  syncNodeQuicPort,
+				Default: defaultSyncNodeQuicPort,
 			},
 			Validate: survey.Required,
 		},
 	}
 
 	answers := struct {
-		Address string
+		Address   string
 		YamuxPort string
-		QuicPort string
-	}{}
+		QuicPort  string
+	}{
+		Address:   defaultSyncNodeAddress,
+		YamuxPort: defaultSyncNodeYamuxPort,
+		QuicPort:  defaultSyncNodeQuicPort,
+	}
 
-	err := survey.Ask(syncQs, &answers)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
+	if !autoFlag {
+		err := survey.Ask(syncQs, &answers)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 	}
 
 	syncNode := defaultSyncNode()
-	syncNode.Yamux.ListenAddrs = append(syncNode.Yamux.ListenAddrs, answers.Address + ":" + answers.YamuxPort)
-	syncNode.Quic.ListenAddrs = append(syncNode.Quic.ListenAddrs, answers.Address + ":" + answers.QuicPort)
+	syncNode.Yamux.ListenAddrs = append(syncNode.Yamux.ListenAddrs, answers.Address+":"+answers.YamuxPort)
+	syncNode.Quic.ListenAddrs = append(syncNode.Quic.ListenAddrs, answers.Address+":"+answers.QuicPort)
 	syncNode.Account = generateAccount()
 
 	addToNetwork(syncNode.GeneralNodeConfig, "tree")
 	syncNodes = append(syncNodes, syncNode)
 
 	// Increase sync node port
-	port_num, _ := strconv.ParseInt(syncNodeYamuxPort, 10, 0)
-	port_num += 1
-	syncNodeYamuxPort = strconv.FormatInt(port_num, 10)
-	port_num, _ = strconv.ParseInt(syncNodeQuicPort, 10, 0)
-	port_num += 1
-	syncNodeQuicPort = strconv.FormatInt(port_num, 10)
+	cfg.AnySyncNode.YamuxPort++
+	cfg.AnySyncNode.QuicPort++
 }
 
-var fileNodeYamuxPort = "4730"
-var fileNodeQuicPort = "5730"
 var fileNodes = []FileNodeConfig{}
 
 func createFileNode() {
+	var defaultFileNodeAddress = cfg.AnySyncFilenode.ListenAddr
+	var defaultFileNodeYamuxPort = strconv.Itoa(cfg.AnySyncFilenode.YamuxPort)
+	var defaultFileNodeQuicPort = strconv.Itoa(cfg.AnySyncFilenode.QuicPort)
+	var defaultS3Endpoint = cfg.AnySyncFilenode.S3Store.Endpoint
+	var defaultS3Region = cfg.AnySyncFilenode.S3Store.Region
+	var defaultS3Profile = cfg.AnySyncFilenode.S3Store.Profile
+	var defaultS3Bucket = cfg.AnySyncFilenode.S3Store.Bucket
+	var defaultRedisUrl = cfg.AnySyncFilenode.Redis.URL
+	var defaultRedisCluster = "false"
+
 	fmt.Println("\nCreating file node...")
 
 	var fileQs = []*survey.Question{
@@ -406,7 +533,7 @@ func createFileNode() {
 			Name: "address",
 			Prompt: &survey.Input{
 				Message: "Any-Sync File Node address (without port)",
-				Default: "127.0.0.1",
+				Default: defaultFileNodeAddress,
 			},
 			Validate: survey.Required,
 		},
@@ -414,7 +541,7 @@ func createFileNode() {
 			Name: "yamuxPort",
 			Prompt: &survey.Input{
 				Message: "Any-Sync File Node Yamux (TCP) port",
-				Default:  fileNodeYamuxPort,
+				Default:  defaultFileNodeYamuxPort,
 			},
 			Validate: survey.Required,
 		},
@@ -422,7 +549,7 @@ func createFileNode() {
 			Name: "quicPort",
 			Prompt: &survey.Input{
 				Message: "Any-Sync File Node Quic (UDP) port",
-				Default:  fileNodeQuicPort,
+				Default:  defaultFileNodeQuicPort,
 			},
 			Validate: survey.Required,
 		},
@@ -431,13 +558,14 @@ func createFileNode() {
 			Prompt: &survey.Input{
 				Message: "S3 Endpoint",
 				Help: "Required only in the case you self-host S3-compatible object storage",
+				Default: defaultS3Endpoint,
 			},
 		},
 		{
 			Name: "s3Region",
 			Prompt: &survey.Input{
 				Message: "S3 Region",
-				Default: "eu-central-1",
+				Default: defaultS3Region,
 			},
 			Validate: survey.Required,
 		},
@@ -445,7 +573,7 @@ func createFileNode() {
 			Name: "s3Profile",
 			Prompt: &survey.Input{
 				Message: "S3 Profile",
-				Default: "default",
+				Default: defaultS3Profile,
 			},
 			Validate: survey.Required,
 		},
@@ -453,7 +581,7 @@ func createFileNode() {
 			Name: "s3Bucket",
 			Prompt: &survey.Input{
 				Message: "S3 Bucket",
-				Default: "any-sync-files",
+				Default: defaultS3Bucket,
 			},
 			Validate: survey.Required,
 		},
@@ -461,7 +589,7 @@ func createFileNode() {
 			Name: "redisURL",
 			Prompt: &survey.Input{
 				Message: "Redis URL",
-				Default: "redis://127.0.0.1:6379/?dial_timeout=3&read_timeout=6s",
+				Default: defaultRedisUrl,
 			},
 			Validate: survey.Required,
 		},
@@ -470,7 +598,7 @@ func createFileNode() {
 			Prompt: &survey.Select{
 				Message: "Is your redis installation a cluster?",
 				Options: []string{"true", "false"},
-				Default: "false",
+				Default: defaultRedisCluster,
 			},
 			Validate: survey.Required,
 		},
@@ -486,12 +614,24 @@ func createFileNode() {
 		S3Bucket     string
 		RedisURL     string
 		RedisCluster string
-	}{}
+	}{
+		Address:      defaultFileNodeAddress,
+		YamuxPort:    defaultFileNodeYamuxPort,
+		QuicPort:     defaultFileNodeQuicPort,
+		S3Endpoint:   defaultS3Endpoint,
+		S3Region:     defaultS3Region,
+		S3Profile:    defaultS3Profile,
+		S3Bucket:     defaultS3Bucket,
+		RedisURL:     defaultRedisUrl,
+		RedisCluster: defaultRedisCluster,
+	}
 
-	err := survey.Ask(fileQs, &answers)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
+	if !autoFlag {
+		err := survey.Ask(fileQs, &answers)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 	}
 
 	fileNode := defaultFileNode()
@@ -509,12 +649,8 @@ func createFileNode() {
 	fileNodes = append(fileNodes, fileNode)
 
 	// Increase file node port
-	port_num, _ := strconv.ParseInt(fileNodeYamuxPort, 10, 0)
-	port_num += 1
-	fileNodeYamuxPort = strconv.FormatInt(port_num, 10)
-	port_num, _ = strconv.ParseInt(fileNodeQuicPort, 10, 0)
-	port_num += 1
-	fileNodeQuicPort = strconv.FormatInt(port_num, 10)
+	cfg.AnySyncFilenode.YamuxPort++
+	cfg.AnySyncFilenode.QuicPort++
 }
 
 func lastStepOptions() {
@@ -525,17 +661,19 @@ func lastStepOptions() {
 		Default: "No, generate configs",
 	}
 
-	option := ""
-	survey.AskOne(prompt, &option, survey.WithValidator(survey.Required))
-	switch option {
-	case "Add sync-node":
-		createSyncNode()
-		lastStepOptions()
-	case "Add file-node":
-		createFileNode()
-		lastStepOptions()
-	default:
-		return
+	if !autoFlag {
+		option := ""
+		survey.AskOne(prompt, &option, survey.WithValidator(survey.Required))
+		switch option {
+		case "Add sync-node":
+			createSyncNode(0)
+			lastStepOptions()
+		case "Add file-node":
+			createFileNode()
+			lastStepOptions()
+		default:
+			return
+		}
 	}
 }
 
@@ -608,9 +746,9 @@ func defaultCoordinatorNode() CoordinatorNodeConfig {
 			SpaceMembersWrite int "yaml:\"spaceMembersWrite\""
 			SharedSpacesLimit int "yaml:\"sharedSpacesLimit\""
 		}{
-			SpaceMembersRead:  1000,
-			SpaceMembersWrite: 1000,
-			SharedSpacesLimit: 1000,
+			SpaceMembersRead:  cfg.AnySyncCoordinator.DefaultLimits.SpaceMembersRead,
+			SpaceMembersWrite: cfg.AnySyncCoordinator.DefaultLimits.SpaceMembersWrite,
+			SharedSpacesLimit: cfg.AnySyncCoordinator.DefaultLimits.SharedSpacesLimit,
 		},
 	}
 }
@@ -673,15 +811,19 @@ func defaultFileNode() FileNodeConfig {
 	return FileNodeConfig{
 		GeneralNodeConfig:        defaultGeneralNode(),
 		NetworkUpdateIntervalSec: 600,
-		DefaultLimit:             1073741824,
+		DefaultLimit:             cfg.AnySyncFilenode.DefaultLimit,
 		S3Store: struct {
-			Endpoint   string "yaml:\"endpoint,omitempty\""
-			Region     string "yaml:\"region\""
-			Profile    string "yaml:\"profile\""
-			Bucket     string "yaml:\"bucket\""
-			MaxThreads int    "yaml:\"maxThreads\""
+			Endpoint       string "yaml:\"endpoint,omitempty\""
+			Bucket         string "yaml:\"bucket\""
+			IndexBucket    string "yaml:\"indexBucket\""
+			Region         string "yaml:\"region\""
+			Profile        string "yaml:\"profile\""
+			MaxThreads     int    "yaml:\"maxThreads\""
+			ForcePathStyle bool   "yaml:\"forcePathStyle\""
 		}{
 			MaxThreads: 16,
+			IndexBucket: cfg.AnySyncFilenode.S3Store.IndexBucket,
+			ForcePathStyle: cfg.AnySyncFilenode.S3Store.ForcePathStyle,
 		},
 		Redis: struct {
 			IsCluster bool   "yaml:\"isCluster\""
@@ -694,6 +836,11 @@ func createConfigFile(in interface{}, ymlFilename string) {
 	bytes, err := yaml.Marshal(in)
 	if err != nil {
 		panic(fmt.Sprintf("Could not marshal the keys: %v", err))
+	}
+
+	dir := filepath.Dir(ymlFilename)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		panic(fmt.Sprintf("Could not create the directory: %v", err))
 	}
 
 	err = os.WriteFile(ymlFilename+".yml", bytes, os.ModePerm)
