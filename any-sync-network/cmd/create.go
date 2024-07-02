@@ -33,6 +33,15 @@ type GeneralNodeConfig struct {
 	} `yaml:"quic"`
 	Network          Network `yaml:"network"`
 	NetworkStorePath string  `yaml:"networkStorePath"`
+	Log struct {
+		Production   bool   `yaml:"production"`
+		DefaultLevel string `yaml:"defaultLevel"`
+		NamedLevels  struct {
+		} `yaml:"namedLevels"`
+	} `yaml:"log"`
+	Metric struct {
+		Addr string   `yaml:"addr"`
+	} `yaml:"metric"`
 }
 
 type CoordinatorNodeConfig struct {
@@ -59,12 +68,10 @@ type ConsensusNodeConfig struct {
 		Database string `yaml:"database"`
 		LogCollection string `yaml:"logCollection"`
 	} `yaml:"mongo"`
-	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 }
 
 type SyncNodeConfig struct {
 	GeneralNodeConfig        `yaml:".,inline"`
-	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 	Space                    struct {
 		GcTTL      int `yaml:"gcTTL"`
 		SyncPeriod int `yaml:"syncPeriod"`
@@ -76,12 +83,6 @@ type SyncNodeConfig struct {
 		SyncOnStart       bool `yaml:"syncOnStart"`
 		PeriodicSyncHours int  `yaml:"periodicSyncHours"`
 	} `yaml:"nodeSync"`
-	Log struct {
-		Production   bool   `yaml:"production"`
-		DefaultLevel string `yaml:"defaultLevel"`
-		NamedLevels  struct {
-		} `yaml:"namedLevels"`
-	} `yaml:"log"`
 	ApiServer struct {
 		ListenAddr string `yaml:"listenAddr"`
 	} `yaml:"apiServer"`
@@ -89,7 +90,6 @@ type SyncNodeConfig struct {
 
 type FileNodeConfig struct {
 	GeneralNodeConfig        `yaml:".,inline"`
-	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 	DefaultLimit             int `yaml:"defaultLimit"`
 	S3Store                  struct {
 		Endpoint       string `yaml:"endpoint,omitempty"`
@@ -724,6 +724,20 @@ func defaultGeneralNode() GeneralNodeConfig {
 			DialTimeoutSec:  10,
 		},
 		NetworkStorePath: "/networkStore",
+		Log: struct {
+			Production   bool     "yaml:\"production\""
+			DefaultLevel string   "yaml:\"defaultLevel\""
+			NamedLevels  struct{} "yaml:\"namedLevels\""
+		}{
+			Production:   false,
+			DefaultLevel: "",
+			NamedLevels:  struct{}{},
+		},
+		Metric: struct {
+			Addr string "yaml:\"addr\""
+		}{
+			Addr: "0.0.0.0:8000",
+		},
 	}
 }
 
@@ -763,14 +777,12 @@ func defaultConsensusNode() ConsensusNodeConfig {
 		}{
 			LogCollection: "log",
 		},
-		NetworkUpdateIntervalSec: 600,
 	}
 }
 
 func defaultSyncNode() SyncNodeConfig {
 	return SyncNodeConfig{
 		GeneralNodeConfig:        defaultGeneralNode(),
-		NetworkUpdateIntervalSec: 600,
 		Space: struct {
 			GcTTL      int "yaml:\"gcTTL\""
 			SyncPeriod int "yaml:\"syncPeriod\""
@@ -790,15 +802,6 @@ func defaultSyncNode() SyncNodeConfig {
 			SyncOnStart:       true,
 			PeriodicSyncHours: 2,
 		},
-		Log: struct {
-			Production   bool     "yaml:\"production\""
-			DefaultLevel string   "yaml:\"defaultLevel\""
-			NamedLevels  struct{} "yaml:\"namedLevels\""
-		}{
-			Production:   false,
-			DefaultLevel: "",
-			NamedLevels:  struct{}{},
-		},
 		ApiServer: struct {
 			ListenAddr string "yaml:\"listenAddr\""
 		}{
@@ -810,7 +813,6 @@ func defaultSyncNode() SyncNodeConfig {
 func defaultFileNode() FileNodeConfig {
 	return FileNodeConfig{
 		GeneralNodeConfig:        defaultGeneralNode(),
-		NetworkUpdateIntervalSec: 600,
 		DefaultLimit:             cfg.AnySyncFilenode.DefaultLimit,
 		S3Store: struct {
 			Endpoint       string "yaml:\"endpoint,omitempty\""
