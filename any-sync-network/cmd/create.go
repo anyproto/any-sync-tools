@@ -59,12 +59,10 @@ type ConsensusNodeConfig struct {
 		Database string `yaml:"database"`
 		LogCollection string `yaml:"logCollection"`
 	} `yaml:"mongo"`
-	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 }
 
 type SyncNodeConfig struct {
 	GeneralNodeConfig        `yaml:".,inline"`
-	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 	Space                    struct {
 		GcTTL      int `yaml:"gcTTL"`
 		SyncPeriod int `yaml:"syncPeriod"`
@@ -89,7 +87,6 @@ type SyncNodeConfig struct {
 
 type FileNodeConfig struct {
 	GeneralNodeConfig        `yaml:".,inline"`
-	NetworkUpdateIntervalSec int `yaml:"networkUpdateIntervalSec"`
 	DefaultLimit             int `yaml:"defaultLimit"`
 	S3Store                  struct {
 		Endpoint       string `yaml:"endpoint,omitempty"`
@@ -763,14 +760,12 @@ func defaultConsensusNode() ConsensusNodeConfig {
 		}{
 			LogCollection: "log",
 		},
-		NetworkUpdateIntervalSec: 600,
 	}
 }
 
 func defaultSyncNode() SyncNodeConfig {
 	return SyncNodeConfig{
 		GeneralNodeConfig:        defaultGeneralNode(),
-		NetworkUpdateIntervalSec: 600,
 		Space: struct {
 			GcTTL      int "yaml:\"gcTTL\""
 			SyncPeriod int "yaml:\"syncPeriod\""
@@ -810,7 +805,6 @@ func defaultSyncNode() SyncNodeConfig {
 func defaultFileNode() FileNodeConfig {
 	return FileNodeConfig{
 		GeneralNodeConfig:        defaultGeneralNode(),
-		NetworkUpdateIntervalSec: 600,
 		DefaultLimit:             cfg.AnySyncFilenode.DefaultLimit,
 		S3Store: struct {
 			Endpoint       string "yaml:\"endpoint,omitempty\""
