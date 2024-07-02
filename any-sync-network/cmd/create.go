@@ -33,6 +33,15 @@ type GeneralNodeConfig struct {
 	} `yaml:"quic"`
 	Network          Network `yaml:"network"`
 	NetworkStorePath string  `yaml:"networkStorePath"`
+	Log struct {
+		Production   bool   `yaml:"production"`
+		DefaultLevel string `yaml:"defaultLevel"`
+		NamedLevels  struct {
+		} `yaml:"namedLevels"`
+	} `yaml:"log"`
+	Metric struct {
+		Addr string   `yaml:"addr"`
+	} `yaml:"metric"`
 }
 
 type CoordinatorNodeConfig struct {
@@ -74,12 +83,6 @@ type SyncNodeConfig struct {
 		SyncOnStart       bool `yaml:"syncOnStart"`
 		PeriodicSyncHours int  `yaml:"periodicSyncHours"`
 	} `yaml:"nodeSync"`
-	Log struct {
-		Production   bool   `yaml:"production"`
-		DefaultLevel string `yaml:"defaultLevel"`
-		NamedLevels  struct {
-		} `yaml:"namedLevels"`
-	} `yaml:"log"`
 	ApiServer struct {
 		ListenAddr string `yaml:"listenAddr"`
 	} `yaml:"apiServer"`
@@ -721,6 +724,20 @@ func defaultGeneralNode() GeneralNodeConfig {
 			DialTimeoutSec:  10,
 		},
 		NetworkStorePath: "/networkStore",
+		Log: struct {
+			Production   bool     "yaml:\"production\""
+			DefaultLevel string   "yaml:\"defaultLevel\""
+			NamedLevels  struct{} "yaml:\"namedLevels\""
+		}{
+			Production:   false,
+			DefaultLevel: "",
+			NamedLevels:  struct{}{},
+		},
+		Metric: struct {
+			Addr string "yaml:\"addr\""
+		}{
+			Addr: "0.0.0.0:8000",
+		},
 	}
 }
 
@@ -784,15 +801,6 @@ func defaultSyncNode() SyncNodeConfig {
 		}{
 			SyncOnStart:       true,
 			PeriodicSyncHours: 2,
-		},
-		Log: struct {
-			Production   bool     "yaml:\"production\""
-			DefaultLevel string   "yaml:\"defaultLevel\""
-			NamedLevels  struct{} "yaml:\"namedLevels\""
-		}{
-			Production:   false,
-			DefaultLevel: "",
-			NamedLevels:  struct{}{},
 		},
 		ApiServer: struct {
 			ListenAddr string "yaml:\"listenAddr\""
