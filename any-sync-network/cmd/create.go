@@ -49,6 +49,8 @@ type CoordinatorNodeConfig struct {
 	Mongo             struct {
 		Connect  string `yaml:"connect"`
 		Database string `yaml:"database"`
+		Log      string `yaml:"log"`
+		Spaces   string `yaml:"spaces"`
 	} `yaml:"mongo"`
 	SpaceStatus struct {
 		RunSeconds         int `yaml:"runSeconds"`
@@ -747,13 +749,18 @@ func defaultCoordinatorNode() CoordinatorNodeConfig {
 		Mongo: struct {
 			Connect  string "yaml:\"connect\""
 			Database string "yaml:\"database\""
-		}{},
+			Log      string "yaml:\"log\""
+			Spaces   string "yaml:\"spaces\""
+		}{
+			Log:     "log",
+			Spaces:  "space",
+		},
 		SpaceStatus: struct {
 			RunSeconds         int "yaml:\"runSeconds\""
 			DeletionPeriodDays int "yaml:\"deletionPeriodDays\""
 		}{
-			RunSeconds:         20,
-			DeletionPeriodDays: 1,
+			RunSeconds:         5,
+			DeletionPeriodDays: 0,
 		},
 		DefaultLimits: struct {
 			SpaceMembersRead  int "yaml:\"spaceMembersRead\""
@@ -788,12 +795,12 @@ func defaultSyncNode() SyncNodeConfig {
 			SyncPeriod int "yaml:\"syncPeriod\""
 		}{
 			GcTTL:      60,
-			SyncPeriod: 240,
+			SyncPeriod: 600,
 		},
 		Storage: struct {
 			Path string "yaml:\"path\""
 		}{
-			Path: "db",
+			Path: "/storage",
 		},
 		NodeSync: struct {
 			SyncOnStart       bool "yaml:\"syncOnStart\""
