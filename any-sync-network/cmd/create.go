@@ -753,7 +753,7 @@ func defaultCoordinatorNode() CoordinatorNodeConfig {
 			Spaces   string "yaml:\"spaces\""
 		}{
 			Log:     "log",
-			Spaces:  "space",
+			Spaces:  "spaces",
 		},
 		SpaceStatus: struct {
 			RunSeconds         int "yaml:\"runSeconds\""
