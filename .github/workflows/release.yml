@@ -10,7 +10,7 @@ permissions: write-all
 
 jobs:
   build:
-    name: Build release
+    name: build release
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -116,6 +116,7 @@ jobs:
           draft: false
           prerelease: false
           # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          token: ${{ secrets.ANYTYPE_PAT }}
           files: |
             ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip
 
@@ -128,6 +129,7 @@ jobs:
           draft: false
           prerelease: false
           # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          token: ${{ secrets.ANYTYPE_PAT }}
           files: |
             ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz
 
@@ -140,6 +142,7 @@ jobs:
           draft: false
           prerelease: false
           # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          token: ${{ secrets.ANYTYPE_PAT }}
           files: |
             ${{ github.event.repository.name }}_${{ steps.release-version.outputs.RELEASE_VERSION }}_${{ matrix.arch }}.deb
             ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION_RPM }}-1.${{ matrix.rpm_arch }}.rpm
