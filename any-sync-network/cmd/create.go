@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"path/filepath"
+	"strconv"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/anyproto/any-sync/accountservice"
@@ -33,14 +33,14 @@ type GeneralNodeConfig struct {
 	} `yaml:"quic"`
 	Network          Network `yaml:"network"`
 	NetworkStorePath string  `yaml:"networkStorePath"`
-	Log struct {
+	Log              struct {
 		Production   bool   `yaml:"production"`
 		DefaultLevel string `yaml:"defaultLevel"`
 		NamedLevels  struct {
 		} `yaml:"namedLevels"`
 	} `yaml:"log"`
 	Metric struct {
-		Addr string   `yaml:"addr"`
+		Addr string `yaml:"addr"`
 	} `yaml:"metric"`
 }
 
@@ -66,15 +66,15 @@ type CoordinatorNodeConfig struct {
 type ConsensusNodeConfig struct {
 	GeneralNodeConfig `yaml:".,inline"`
 	Mongo             struct {
-		Connect  string `yaml:"connect"`
-		Database string `yaml:"database"`
+		Connect       string `yaml:"connect"`
+		Database      string `yaml:"database"`
 		LogCollection string `yaml:"logCollection"`
 	} `yaml:"mongo"`
 }
 
 type SyncNodeConfig struct {
-	GeneralNodeConfig        `yaml:".,inline"`
-	Space                    struct {
+	GeneralNodeConfig `yaml:".,inline"`
+	Space             struct {
 		GcTTL      int `yaml:"gcTTL"`
 		SyncPeriod int `yaml:"syncPeriod"`
 	} `yaml:"space"`
@@ -91,9 +91,9 @@ type SyncNodeConfig struct {
 }
 
 type FileNodeConfig struct {
-	GeneralNodeConfig        `yaml:".,inline"`
-	DefaultLimit             int `yaml:"defaultLimit"`
-	S3Store                  struct {
+	GeneralNodeConfig `yaml:".,inline"`
+	DefaultLimit      int `yaml:"defaultLimit"`
+	S3Store           struct {
 		Endpoint       string `yaml:"endpoint,omitempty"`
 		Bucket         string `yaml:"bucket"`
 		IndexBucket    string `yaml:"indexBucket"`
@@ -120,60 +120,60 @@ type HeartConfig struct {
 }
 
 type Network struct {
-	ID           string `yaml:"id"`
-	HeartConfig  `yaml:".,inline"`
+	ID          string `yaml:"id"`
+	HeartConfig `yaml:".,inline"`
 }
 
 type DefaultConfig struct {
 	ExternalAddr []string `yaml:"external-addresses"`
 
 	AnySyncCoordinator struct {
-		  ListenAddr    string `yaml:"listen"`
-			YamuxPort     int `yaml:"yamuxPort"`
-			QuicPort      int `yaml:"quicPort"`
-			Mongo         struct {
-					Connect  string `yaml:"connect"`
-					Database string `yaml:"database"`
-			} `yaml:"mongo"`
-			DefaultLimits struct {
-					SpaceMembersRead  int `yaml:"spaceMembersRead"`
-					SpaceMembersWrite int `yaml:"spaceMembersWrite"`
-					SharedSpacesLimit int `yaml:"sharedSpacesLimit"`
-			} `yaml:"defaultLimits"`
+		ListenAddr string `yaml:"listen"`
+		YamuxPort  int    `yaml:"yamuxPort"`
+		QuicPort   int    `yaml:"quicPort"`
+		Mongo      struct {
+			Connect  string `yaml:"connect"`
+			Database string `yaml:"database"`
+		} `yaml:"mongo"`
+		DefaultLimits struct {
+			SpaceMembersRead  int `yaml:"spaceMembersRead"`
+			SpaceMembersWrite int `yaml:"spaceMembersWrite"`
+			SharedSpacesLimit int `yaml:"sharedSpacesLimit"`
+		} `yaml:"defaultLimits"`
 	} `yaml:"any-sync-coordinator"`
 
 	AnySyncConsensusNode struct {
-		  ListenAddr    string `yaml:"listen"`
-			YamuxPort int `yaml:"yamuxPort"`
-			QuicPort  int `yaml:"quicPort"`
-			Mongo     struct {
-					Connect  string `yaml:"connect"`
-					Database string `yaml:"database"`
-			} `yaml:"mongo"`
+		ListenAddr string `yaml:"listen"`
+		YamuxPort  int    `yaml:"yamuxPort"`
+		QuicPort   int    `yaml:"quicPort"`
+		Mongo      struct {
+			Connect  string `yaml:"connect"`
+			Database string `yaml:"database"`
+		} `yaml:"mongo"`
 	} `yaml:"any-sync-consensusnode"`
 
 	AnySyncFilenode struct {
-		  ListenAddr    string `yaml:"listen"`
-			YamuxPort int `yaml:"yamuxPort"`
-			QuicPort  int `yaml:"quicPort"`
-			S3Store   struct {
-					Endpoint       string `yaml:"endpoint"`
-					Bucket         string `yaml:"bucket"`
-					IndexBucket    string `yaml:"indexBucket"`
-					Region         string `yaml:"region"`
-					Profile        string `yaml:"profile"`
-					ForcePathStyle bool   `yaml:"forcePathStyle"`
-			} `yaml:"s3Store"`
-			Redis struct {
-					URL string `yaml:"url"`
-			} `yaml:"redis"`
-			DefaultLimit int `yaml:"defaultLimit"`
+		ListenAddr string `yaml:"listen"`
+		YamuxPort  int    `yaml:"yamuxPort"`
+		QuicPort   int    `yaml:"quicPort"`
+		S3Store    struct {
+			Endpoint       string `yaml:"endpoint"`
+			Bucket         string `yaml:"bucket"`
+			IndexBucket    string `yaml:"indexBucket"`
+			Region         string `yaml:"region"`
+			Profile        string `yaml:"profile"`
+			ForcePathStyle bool   `yaml:"forcePathStyle"`
+		} `yaml:"s3Store"`
+		Redis struct {
+			URL string `yaml:"url"`
+		} `yaml:"redis"`
+		DefaultLimit int `yaml:"defaultLimit"`
 	} `yaml:"any-sync-filenode"`
 
 	AnySyncNode struct {
-		  ListenAddr []string `yaml:"listen"`
-			YamuxPort  int `yaml:"yamuxPort"`
-			QuicPort   int `yaml:"quicPort"`
+		ListenAddr []string `yaml:"listen"`
+		YamuxPort  []int    `yaml:"yamuxPort"`
+		QuicPort   []int    `yaml:"quicPort"`
 	} `yaml:"any-sync-node"`
 }
 
@@ -216,8 +216,8 @@ var create = &cobra.Command{
 		var defaultCoordinatorAddress = cfg.AnySyncCoordinator.ListenAddr
 		var defaultCoordinatorYamuxPort = strconv.Itoa(cfg.AnySyncCoordinator.YamuxPort)
 		var defaultCoordinatorQuicPort = strconv.Itoa(cfg.AnySyncCoordinator.QuicPort)
-		var	defaultCoordinatorMongoConnect = cfg.AnySyncCoordinator.Mongo.Connect
-		var	defaultCoordinatorMongoDb = cfg.AnySyncCoordinator.Mongo.Database
+		var defaultCoordinatorMongoConnect = cfg.AnySyncCoordinator.Mongo.Connect
+		var defaultCoordinatorMongoDb = cfg.AnySyncCoordinator.Mongo.Database
 
 		var coordinatorQs = []*survey.Question{
 			{
@@ -225,7 +225,6 @@ var create = &cobra.Command{
 				Prompt: &survey.Input{
 					Message: "Any-Sync Coordinator Node address (without port)",
 					Default: defaultCoordinatorAddress,
-
 				},
 				Validate: survey.Required,
 			},
@@ -271,9 +270,9 @@ var create = &cobra.Command{
 			MongoDB      string
 		}{
 			Address:      defaultCoordinatorAddress,
-			YamuxPort:   	defaultCoordinatorYamuxPort,
-			QuicPort:   	defaultCoordinatorQuicPort,
-			MongoConnect:	defaultCoordinatorMongoConnect,
+			YamuxPort:    defaultCoordinatorYamuxPort,
+			QuicPort:     defaultCoordinatorQuicPort,
+			MongoConnect: defaultCoordinatorMongoConnect,
 			MongoDB:      defaultCoordinatorMongoDb,
 		}
 
@@ -359,8 +358,8 @@ var create = &cobra.Command{
 		}
 
 		consensusNode := defaultConsensusNode()
-		consensusNode.Yamux.ListenAddrs = append(consensusNode.Yamux.ListenAddrs, consensusAs.Address + ":" + consensusAs.YamuxPort)
-		consensusNode.Quic.ListenAddrs = append(consensusNode.Quic.ListenAddrs, consensusAs.Address + ":" + consensusAs.QuicPort)
+		consensusNode.Yamux.ListenAddrs = append(consensusNode.Yamux.ListenAddrs, consensusAs.Address+":"+consensusAs.YamuxPort)
+		consensusNode.Quic.ListenAddrs = append(consensusNode.Quic.ListenAddrs, consensusAs.Address+":"+consensusAs.QuicPort)
 		consensusNode.Mongo.Connect = cfg.AnySyncConsensusNode.Mongo.Connect
 		consensusNode.Mongo.Database = consensusAs.MongoDB
 		consensusNode.Account = generateAccount()
@@ -371,10 +370,11 @@ var create = &cobra.Command{
 		if !autoFlag {
 			createSyncNode(0)
 		} else {
-			for node := 0; node < listenCount; node++ {
-				createSyncNode(node)
+			for i := 0; i < listenCount; i++ {
+				createSyncNode(i)
 			}
 		}
+
 		createFileNode()
 
 		lastStepOptions()
@@ -402,7 +402,7 @@ var create = &cobra.Command{
 			}
 		}
 
-		createConfigFile(network.HeartConfig, "etc/client") // to import to client app
+		createConfigFile(network.HeartConfig, "etc/client")                       // to import to client app
 		createConfigFile(network.HeartConfig, "etc/any-sync-coordinator/network") // to any-sync-confapply tool
 
 		fmt.Println("Done!")
@@ -411,7 +411,7 @@ var create = &cobra.Command{
 
 var network = Network{}
 
-func addToNetwork(node GeneralNodeConfig, nodeType string) {
+func addToNetwork(node GeneralNodeConfig, nodeType string, index ...int) {
 	addresses := []string{}
 	yamuxPort := 0
 	quicPort := 0
@@ -427,8 +427,13 @@ func addToNetwork(node GeneralNodeConfig, nodeType string) {
 		yamuxPort = cfg.AnySyncFilenode.YamuxPort
 		quicPort = cfg.AnySyncFilenode.QuicPort
 	case "tree":
-		yamuxPort = cfg.AnySyncNode.YamuxPort
-		quicPort = cfg.AnySyncNode.QuicPort
+		if len(index) > 0 {
+			yamuxPort = cfg.AnySyncNode.YamuxPort[index[0]]
+			quicPort = cfg.AnySyncNode.QuicPort[index[0]]
+		} else {
+			fmt.Println("Error: Index required for tree node type")
+			return
+		}
 	}
 
 	for _, addr := range node.Yamux.ListenAddrs {
@@ -452,8 +457,8 @@ var syncNodes = []SyncNodeConfig{}
 
 func createSyncNode(index int) {
 	var defaultSyncNodeAddress = cfg.AnySyncNode.ListenAddr[index]
-	var defaultSyncNodeYamuxPort = strconv.Itoa(cfg.AnySyncNode.YamuxPort)
-	var defaultSyncNodeQuicPort = strconv.Itoa(cfg.AnySyncNode.QuicPort)
+	var defaultSyncNodeYamuxPort = strconv.Itoa(cfg.AnySyncNode.YamuxPort[index])
+	var defaultSyncNodeQuicPort = strconv.Itoa(cfg.AnySyncNode.QuicPort[index])
 
 	fmt.Println("\nCreating sync node...")
 
@@ -507,12 +512,8 @@ func createSyncNode(index int) {
 	syncNode.Quic.ListenAddrs = append(syncNode.Quic.ListenAddrs, answers.Address+":"+answers.QuicPort)
 	syncNode.Account = generateAccount()
 
-	addToNetwork(syncNode.GeneralNodeConfig, "tree")
+	addToNetwork(syncNode.GeneralNodeConfig, "tree", index)
 	syncNodes = append(syncNodes, syncNode)
-
-	// Increase sync node port
-	cfg.AnySyncNode.YamuxPort++
-	cfg.AnySyncNode.QuicPort++
 }
 
 var fileNodes = []FileNodeConfig{}
@@ -543,7 +544,7 @@ func createFileNode() {
 			Name: "yamuxPort",
 			Prompt: &survey.Input{
 				Message: "Any-Sync File Node Yamux (TCP) port",
-				Default:  defaultFileNodeYamuxPort,
+				Default: defaultFileNodeYamuxPort,
 			},
 			Validate: survey.Required,
 		},
@@ -551,7 +552,7 @@ func createFileNode() {
 			Name: "quicPort",
 			Prompt: &survey.Input{
 				Message: "Any-Sync File Node Quic (UDP) port",
-				Default:  defaultFileNodeQuicPort,
+				Default: defaultFileNodeQuicPort,
 			},
 			Validate: survey.Required,
 		},
@@ -559,7 +560,7 @@ func createFileNode() {
 			Name: "s3Endpoint",
 			Prompt: &survey.Input{
 				Message: "S3 Endpoint",
-				Help: "Required only in the case you self-host S3-compatible object storage",
+				Help:    "Required only in the case you self-host S3-compatible object storage",
 				Default: defaultS3Endpoint,
 			},
 		},
@@ -637,8 +638,8 @@ func createFileNode() {
 	}
 
 	fileNode := defaultFileNode()
-	fileNode.Yamux.ListenAddrs = append(fileNode.Yamux.ListenAddrs, answers.Address + ":" + answers.YamuxPort)
-	fileNode.Quic.ListenAddrs = append(fileNode.Quic.ListenAddrs, answers.Address + ":" + answers.QuicPort)
+	fileNode.Yamux.ListenAddrs = append(fileNode.Yamux.ListenAddrs, answers.Address+":"+answers.YamuxPort)
+	fileNode.Quic.ListenAddrs = append(fileNode.Quic.ListenAddrs, answers.Address+":"+answers.QuicPort)
 	fileNode.S3Store.Endpoint = answers.S3Endpoint
 	fileNode.S3Store.Region = answers.S3Region
 	fileNode.S3Store.Profile = answers.S3Profile
@@ -752,8 +753,8 @@ func defaultCoordinatorNode() CoordinatorNodeConfig {
 			Log      string "yaml:\"log\""
 			Spaces   string "yaml:\"spaces\""
 		}{
-			Log:     "log",
-			Spaces:  "spaces",
+			Log:    "log",
+			Spaces: "spaces",
 		},
 		SpaceStatus: struct {
 			RunSeconds         int "yaml:\"runSeconds\""
@@ -778,8 +779,8 @@ func defaultConsensusNode() ConsensusNodeConfig {
 	return ConsensusNodeConfig{
 		GeneralNodeConfig: defaultGeneralNode(),
 		Mongo: struct {
-			Connect  string "yaml:\"connect\""
-			Database string "yaml:\"database\""
+			Connect       string "yaml:\"connect\""
+			Database      string "yaml:\"database\""
 			LogCollection string "yaml:\"logCollection\""
 		}{
 			LogCollection: "log",
@@ -789,7 +790,7 @@ func defaultConsensusNode() ConsensusNodeConfig {
 
 func defaultSyncNode() SyncNodeConfig {
 	return SyncNodeConfig{
-		GeneralNodeConfig:        defaultGeneralNode(),
+		GeneralNodeConfig: defaultGeneralNode(),
 		Space: struct {
 			GcTTL      int "yaml:\"gcTTL\""
 			SyncPeriod int "yaml:\"syncPeriod\""
@@ -819,8 +820,8 @@ func defaultSyncNode() SyncNodeConfig {
 
 func defaultFileNode() FileNodeConfig {
 	return FileNodeConfig{
-		GeneralNodeConfig:        defaultGeneralNode(),
-		DefaultLimit:             cfg.AnySyncFilenode.DefaultLimit,
+		GeneralNodeConfig: defaultGeneralNode(),
+		DefaultLimit:      cfg.AnySyncFilenode.DefaultLimit,
 		S3Store: struct {
 			Endpoint       string "yaml:\"endpoint,omitempty\""
 			Bucket         string "yaml:\"bucket\""
@@ -830,8 +831,8 @@ func defaultFileNode() FileNodeConfig {
 			MaxThreads     int    "yaml:\"maxThreads\""
 			ForcePathStyle bool   "yaml:\"forcePathStyle\""
 		}{
-			MaxThreads: 16,
-			IndexBucket: cfg.AnySyncFilenode.S3Store.IndexBucket,
+			MaxThreads:     16,
+			IndexBucket:    cfg.AnySyncFilenode.S3Store.IndexBucket,
 			ForcePathStyle: cfg.AnySyncFilenode.S3Store.ForcePathStyle,
 		},
 		Redis: struct {

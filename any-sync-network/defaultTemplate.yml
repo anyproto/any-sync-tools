@@ -41,5 +41,11 @@ any-sync-node:
   - any-sync-node-1
   - any-sync-node-2
   - any-sync-node-3
-  yamuxPort: 4430
-  quicPort: 5430
+  yamuxPort:
+  - 4430
+  - 4431
+  - 4432
+  quicPort:
+  - 5430
+  - 5431
+  - 5432
