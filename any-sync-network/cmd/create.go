@@ -81,6 +81,7 @@ type SyncNodeConfig struct {
 	} `yaml:"space"`
 	Storage struct {
 		Path string `yaml:"path"`
+		AnyStorePath string `yaml:"anyStorePath"`
 	} `yaml:"storage"`
 	NodeSync struct {
 		SyncOnStart       bool `yaml:"syncOnStart"`
@@ -803,8 +804,10 @@ func defaultSyncNode() SyncNodeConfig {
 		},
 		Storage: struct {
 			Path string "yaml:\"path\""
+			AnyStorePath string "yaml:\"anyStorePath\""
 		}{
 			Path: "/storage",
+			AnyStorePath: "/anyStorage",
 		},
 		NodeSync: struct {
 			SyncOnStart       bool "yaml:\"syncOnStart\""
