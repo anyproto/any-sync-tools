@@ -172,7 +172,10 @@ func probeYamux(a *app.App, addr string) {
 
 	l.Debug("start proto handshake")
 	phst := time.Now()
-	if err = handshake.OutgoingProtoHandshake(ctx, sc, handshakeproto.ProtoType_DRPC); err != nil {
+	if _, err = handshake.OutgoingProtoHandshake(ctx, sc, &handshakeproto.Proto{
+		Proto:     handshakeproto.ProtoType_DRPC,
+		Encodings: []handshakeproto.Encoding{handshakeproto.Encoding_None},
+	}); err != nil {
 		l.Warn("proto handshake error", zap.Duration("dur", time.Since(phst)), zap.Error(err))
 		return
 	} else {
@@ -220,7 +223,10 @@ func probeQuic(a *app.App, addr string) {
 
 	l.Debug("start proto handshake")
 	phst := time.Now()
-	if err = handshake.OutgoingProtoHandshake(ctx, sc, handshakeproto.ProtoType_DRPC); err != nil {
+	if _, err = handshake.OutgoingProtoHandshake(ctx, sc, &handshakeproto.Proto{
+		Proto:     handshakeproto.ProtoType_DRPC,
+		Encodings: []handshakeproto.Encoding{handshakeproto.Encoding_None},
+	}); err != nil {
 		l.Warn("proto handshake error", zap.Duration("dur", time.Since(phst)), zap.Error(err))
 		return
 	} else {

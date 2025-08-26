@@ -17,6 +17,7 @@ import (
 type GeneralNodeConfig struct {
 	Account accountservice.Config `yaml:"account"`
 	Drpc    struct {
+		Snappy bool `yaml:"snappy"`
 		Stream struct {
 			MaxMsgSizeMb int `yaml:"maxMsgSizeMb"`
 		} `yaml:"stream"`
@@ -80,7 +81,6 @@ type SyncNodeConfig struct {
 	} `yaml:"space"`
 	Storage struct {
 		Path string `yaml:"path"`
-		AnyStorePath string `yaml:"anyStorePath"`
 	} `yaml:"storage"`
 	NodeSync struct {
 		SyncOnStart       bool `yaml:"syncOnStart"`
@@ -701,10 +701,12 @@ func generateAccount() accountservice.Config {
 func defaultGeneralNode() GeneralNodeConfig {
 	return GeneralNodeConfig{
 		Drpc: struct {
+			Snappy bool `yaml:"snappy"`
 			Stream struct {
 				MaxMsgSizeMb int "yaml:\"maxMsgSizeMb\""
 			} "yaml:\"stream\""
 		}{
+			Snappy: true,
 			Stream: struct {
 				MaxMsgSizeMb int "yaml:\"maxMsgSizeMb\""
 			}{
@@ -801,10 +803,8 @@ func defaultSyncNode() SyncNodeConfig {
 		},
 		Storage: struct {
 			Path string "yaml:\"path\""
-			AnyStorePath string "yaml:\"anyStorePath\""
 		}{
 			Path: "/storage",
-			AnyStorePath: "/anyStorage",
 		},
 		NodeSync: struct {
 			SyncOnStart       bool "yaml:\"syncOnStart\""
@@ -823,7 +823,11 @@ func defaultSyncNode() SyncNodeConfig {
 
 func defaultFileNode() FileNodeConfig {
 	return FileNodeConfig{
-		GeneralNodeConfig: defaultGeneralNode(),
+		GeneralNodeConfig: func() GeneralNodeConfig {
+			cfg := defaultGeneralNode()
+			cfg.Drpc.Snappy = false
+			return cfg
+		}(),
 		DefaultLimit:      cfg.AnySyncFilenode.DefaultLimit,
 		S3Store: struct {
 			Endpoint       string "yaml:\"endpoint,omitempty\""
