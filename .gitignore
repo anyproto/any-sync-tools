@@ -3,3 +3,4 @@ tmp/
 .DS_Store
 
 bin/
+any-sync-network/etc

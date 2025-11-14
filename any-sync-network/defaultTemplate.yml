@@ -1,0 +1,51 @@
+external-addresses:
+ - 127.0.0.1
+
+any-sync-coordinator:
+  listen: any-sync-coordinator
+  yamuxPort: 4830
+  quicPort: 5830
+  mongo:
+    connect: mongodb://localhost:27017
+    database: coordinator
+  defaultLimits:
+    spaceMembersRead: 1000
+    spaceMembersWrite: 1000
+    sharedSpacesLimit: 1000
+
+any-sync-consensusnode:
+  listen: any-sync-consensusnode
+  yamuxPort: 4530
+  quicPort: 5530
+  mongo:
+    connect: mongodb://localhost:27017/?w=majority
+    database: consensus
+
+any-sync-filenode:
+  listen: any-sync-filenode
+  yamuxPort: 4730
+  quicPort: 5730
+  s3Store:
+    endpoint: http://localhost:9000
+    bucket: minio-bucket
+    indexBucket: minio-bucket
+    region: us-east-1
+    profile: default
+    forcePathStyle: true
+  redis:
+    url: redis://localhost:6379?dial_timeout=3&read_timeout=6s
+  defaultLimit: 1099511627776
+
+any-sync-node:
+  listen:
+  - any-sync-node-1
+  - any-sync-node-2
+  - any-sync-node-3
+  yamuxPort:
+  - 4430
+  - 4431
+  - 4432
+  quicPort:
+  - 5430
+  - 5431
+  - 5432

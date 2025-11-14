@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var autoFlag bool
+var templatePath string
 var rootCmd = &cobra.Command{
 	Use:   "anyconf",
 	Short: "Configuration builder for Any-Sync nodes.",
@@ -20,4 +22,6 @@ func Execute() {
 
 func init() {
 	rootCmd.AddCommand(create)
+	create.Flags().BoolVar(&autoFlag, "auto", false, "auto generation in non-interactive mode")
+	create.Flags().StringVar(&templatePath, "c", "./defaultTemplate.yml", "path to the template file")
 }

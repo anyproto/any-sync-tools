@@ -4,32 +4,14 @@ on:
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-name: release
+name: Build and release
 
 permissions: write-all
 
 jobs:
-  create_release:
-    name: create release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - name: create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
-          GITHUB_TOKEN: ${{ secrets.ANYTYPE_PAT }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
   build:
     name: build release
-    runs-on: ubuntu-22.04
-    needs: create_release
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch:
@@ -40,58 +22,47 @@ jobs:
           - windows
           - darwin
         go-version:
-          - 1.21.0
+          - '1.24'
         include:
           - arch: amd64
             rpm_arch: x86_64
           - arch: arm64
             rpm_arch: aarch64
-    env:
-      GOPRIVATE: github.com/anyproto
+
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '${{ matrix.go-version }}'
-      - name: git config
-        run: git config --global url.https://${{ secrets.ANYTYPE_PAT }}@github.com/.insteadOf https://github.com/
-      # cache {{
-      - id: go-cache-paths
-        run: |
-          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_OUTPUT
-          echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ${{ steps.go-cache-paths.outputs.GOCACHE }}
-            ${{ steps.go-cache-paths.outputs.GOMODCACHE }}
-          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ matrix.os }}-${{ matrix.arch }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ matrix.go-version }}-${{ matrix.os }}-${{ matrix.arch }}-
-      # }}
+          check-latest: true
 
       # build {{
-      - name: deps
-        run: make deps
+      - name: Install deps
+        run: make deps CGO_ENABLED=0
 
       #- name: unit tests
-      #  run: make test
+      #  run: make test CGO_ENABLED=0
 
-      - name: build
-        run: make build BUILD_GOOS=${{ matrix.os}} BUILD_GOARCH=${{ matrix.arch }}
+      - name: Build
+        run: make build CGO_ENABLED=0 BUILD_GOOS=${{ matrix.os}} BUILD_GOARCH=${{ matrix.arch }}
       # }}
 
-      - name: get release version
+      - name: Get release version
         id: release-version
         run: |
           echo "$GITHUB_REF_NAME" | sed 's|^[a-zA-Z]\+|RELEASE_VERSION=|' >> $GITHUB_OUTPUT
+          echo "$GITHUB_REF_NAME" | sed 's|^[a-zA-Z]\+|RELEASE_VERSION_RPM=|; s|-|_|g' >> $GITHUB_OUTPUT # FPM automatically converts versions for RPM
+
+      - name: Copy config file in ./bin
+        run: cp ./any-sync-network/defaultTemplate.yml ./bin/
 
       # create asset {{
-      - name: create zip archive
+      - name: Create zip | Windows
         if: matrix.os == 'windows'
         run: |
           zip --junk-paths ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip bin/*
-      - name: create tar archive
+
+      - name: Create tar | Linux and Darwin
         if: matrix.os != 'windows'
         run: |
           tar \
@@ -102,7 +73,7 @@ jobs:
             --file=${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz \
             --directory=bin/ \
             .
-      - name: create package deb
+      - name: Create package | Deb
         if: matrix.os == 'linux'
         uses: fb929/github-action-fpm@master
         with:
@@ -115,7 +86,8 @@ jobs:
             --input-type dir
             --output-type deb
           fpm_args: ./bin
-      - name: create package rpm
+
+      - name: Create package | Rpm
         if: matrix.os == 'linux'
         uses: fb929/github-action-fpm@master
         with:
@@ -130,52 +102,91 @@ jobs:
           fpm_args: ./bin
       # }}
 
-      - name: debug
+      - name: Debug
         run: |
           ls -al ./
 
       # upload-release-asset {{
-      - name: upload-release-asset zip
+      - name: Create release and upload asset zip
+        uses: softprops/action-gh-release@v2
         if: matrix.os == 'windows'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip
-          asset_name: ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip
-          asset_content_type: application/zip
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          token: ${{ secrets.ANYTYPE_PAT }}
+          files: |
+            ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.zip
 
-      - name: upload-release-asset tgz
+      - name: Create release and upload asset tgz
+        uses: softprops/action-gh-release@v2
         if: matrix.os != 'windows'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz
-          asset_name: ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz
-          asset_content_type: application/gzip
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          token: ${{ secrets.ANYTYPE_PAT }}
+          files: |
+            ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}.${{ matrix.os }}-${{ matrix.arch }}.tgz
 
-      - name: upload-release-asset deb
+      - name: Create release and upload assets deb and rpm
+        uses: softprops/action-gh-release@v2
         if: matrix.os == 'linux'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./${{ github.event.repository.name }}_${{ steps.release-version.outputs.RELEASE_VERSION }}_${{ matrix.arch }}.deb
-          asset_name: ${{ github.event.repository.name }}_${{ steps.release-version.outputs.RELEASE_VERSION }}_${{ matrix.arch }}.deb
-          asset_content_type: application/octet-stream
-
-      - name: upload-release-asset rpm
-        if: matrix.os == 'linux'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}-1.${{ matrix.rpm_arch }}.rpm
-          asset_name: ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION }}-1.${{ matrix.rpm_arch }}.rpm
-          asset_content_type: application/octet-stream
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          # for triggering workflow "push-docker-image-release" - https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          token: ${{ secrets.ANYTYPE_PAT }}
+          files: |
+            ${{ github.event.repository.name }}_${{ steps.release-version.outputs.RELEASE_VERSION }}_${{ matrix.arch }}.deb
+            ${{ github.event.repository.name }}-${{ steps.release-version.outputs.RELEASE_VERSION_RPM }}-1.${{ matrix.rpm_arch }}.rpm
       # }}
+
+  push-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Log in to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Get docker metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ghcr.io/${{ github.repository }}
+          docker.io/${{ github.repository }}
+        tags: |
+          type=ref,event=tag
+        flavor: |
+          latest=auto
+
+    - name: Build and push image
+      uses: docker/build-push-action@v6
+      with:
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Configuration tools for Any-Sync network
