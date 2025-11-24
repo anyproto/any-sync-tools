@@ -20,6 +20,7 @@ ENV CGO_ENABLED=0
 RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/any-sync-network ./any-sync-network && \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/any-sync-netcheck ./any-sync-netcheck && \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/any-sync-acl-cli ./any-sync-acl-cli && \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/anyconf ./anyconf
 
 
@@ -35,8 +36,9 @@ LABEL org.opencontainers.image.title="any-sync-tools" \
 WORKDIR /app
 
 COPY --from=builder /out/any-sync-network /usr/local/bin/any-sync-network
+COPY --from=builder /src/any-sync-network/defaultTemplate.yml .
 COPY --from=builder /out/any-sync-netcheck /usr/local/bin/any-sync-netcheck
 COPY --from=builder /out/anyconf /usr/local/bin/anyconf
-COPY --from=builder /src/any-sync-network/defaultTemplate.yml .
+COPY --from=builder /out/any-sync-acl-cli /usr/local/bin/any-sync-acl-cli
 
 CMD ["any-sync-network", "--help"]

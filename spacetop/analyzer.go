@@ -1,0 +1,345 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	anystore "github.com/anyproto/any-store"
+	"github.com/anyproto/any-store/query"
+	"github.com/anyproto/any-sync/commonspace/headsync/headstorage"
+	"github.com/anyproto/any-sync/commonspace/object/tree/objecttree"
+	"github.com/anyproto/any-sync/commonspace/spacestorage"
+)
+
+type TreeInfo struct {
+	SpaceID        string
+	TreeID         string
+	ChangeCount    int
+	RecentChanges  int // Changes within time filter (if --since provided)
+	LastModified   time.Time
+	HasTimeFilter  bool
+}
+
+func runAnalyzer() error {
+	ctx := context.Background()
+
+	// Parse time filter if provided
+	var afterTime time.Time
+	if since != "" {
+		duration, err := time.ParseDuration(since)
+		if err != nil {
+			return fmt.Errorf("invalid duration format for --since: %w (use format like 10m, 1h, 24h)", err)
+		}
+		afterTime = time.Now().Add(-duration)
+	}
+
+	// Verify root path exists
+	if _, err := os.Stat(rootPath); err != nil {
+		return fmt.Errorf("path does not exist: %s", rootPath)
+	}
+
+	// Analyze all spaces
+	trees, err := analyzeSpaces(ctx, rootPath, afterTime, spaceID, objectID)
+	if err != nil {
+		return err
+	}
+
+	// Sort by change count (descending)
+	// If time filter is active, sort by recent changes; otherwise by total changes
+	sort.Slice(trees, func(i, j int) bool {
+		if len(trees) > 0 && trees[0].HasTimeFilter {
+			return trees[i].RecentChanges > trees[j].RecentChanges
+		}
+		return trees[i].ChangeCount > trees[j].ChangeCount
+	})
+
+	// Limit to top N
+	if topN > 0 && len(trees) > topN {
+		trees = trees[:topN]
+	}
+
+	// Display results with interactive Bubble Tea UI
+	return runInteractiveUI(ctx, trees, rootPath)
+}
+
+func analyzeSpaces(ctx context.Context, rootPath string, afterTime time.Time, filterSpaceID string, filterObjectID string) ([]TreeInfo, error) {
+	var results []TreeInfo
+
+	// Read all directories in the root path
+	entries, err := os.ReadDir(rootPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory %s: %w", rootPath, err)
+	}
+
+	fmt.Printf("Scanning databases in: %s\n", rootPath)
+	fmt.Println(strings.Repeat("-", 80))
+
+	spacesProcessed := 0
+	spacesSkipped := 0
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		spaceIDFromDir := entry.Name()
+
+		// Apply space ID filter if specified
+		if filterSpaceID != "" && spaceIDFromDir != filterSpaceID {
+			continue
+		}
+
+		dbPath := filepath.Join(rootPath, spaceIDFromDir, "store.db")
+
+		// Check if database file exists
+		if _, err := os.Stat(dbPath); err != nil {
+			spacesSkipped++
+			fmt.Printf("Skipping %s: database file not found at %s\n", spaceIDFromDir, dbPath)
+			continue
+		}
+
+		// Try to open the database
+		db, err := anystore.Open(ctx, dbPath, &anystore.Config{
+			SQLiteConnectionOptions: map[string]string{"synchronous": "off"},
+		})
+		if err != nil {
+			spacesSkipped++
+			fmt.Printf("Skipping %s: failed to open database: %v\n", spaceIDFromDir, err)
+			continue
+		}
+
+		// Process the space
+		spaceResults, err := processSpace(ctx, db, spaceIDFromDir, afterTime, filterObjectID)
+		db.Close()
+
+		if err != nil {
+			spacesSkipped++
+			fmt.Printf("Error processing %s: %v\n", spaceIDFromDir, err)
+			continue
+		}
+
+		results = append(results, spaceResults...)
+		spacesProcessed++
+		fmt.Printf("Processed space: %s (found %d trees)\n", spaceIDFromDir, len(spaceResults))
+
+		// If we found the specific object, we can stop searching
+		if filterObjectID != "" && len(spaceResults) > 0 {
+			break
+		}
+	}
+
+	fmt.Println(strings.Repeat("-", 80))
+	fmt.Printf("Total: %d spaces processed, %d skipped, %d trees found\n\n", spacesProcessed, spacesSkipped, len(results))
+
+	return results, nil
+}
+
+func processSpecificTree(ctx context.Context, db anystore.DB, spaceIDFromDir string, treeID string, afterTime time.Time) (*TreeInfo, error) {
+	// Open changes collection
+	changesColl, err := db.OpenCollection(ctx, objecttree.CollName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open changes collection: %w", err)
+	}
+	defer changesColl.Close()
+
+	// Check if this tree exists and count total changes
+	totalCount, err := changesColl.Find(query.Key{
+		Path:   []string{objecttree.TreeKey},
+		Filter: query.NewComp(query.CompOpEq, treeID),
+	}).Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count total changes: %w", err)
+	}
+
+	// If no changes found, the object doesn't exist in this space
+	if totalCount == 0 {
+		return nil, nil
+	}
+
+	// Count recent changes if time filter is active
+	var recentCount int
+	hasTimeFilter := !afterTime.IsZero()
+	if hasTimeFilter {
+		recentCount, err = changesColl.Find(query.And{
+			query.Key{Path: []string{objecttree.TreeKey}, Filter: query.NewComp(query.CompOpEq, treeID)},
+			query.Key{Path: []string{"a"}, Filter: query.NewComp(query.CompOpGte, float64(afterTime.Unix()))},
+		}).Count(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to count recent changes: %w", err)
+		}
+
+		// Skip this tree if no recent changes when time filter is active
+		if recentCount == 0 {
+			return nil, nil
+		}
+	}
+
+	// Get last modified time
+	qry := changesColl.Find(query.Key{
+		Path:   []string{objecttree.TreeKey},
+		Filter: query.NewComp(query.CompOpEq, treeID),
+	}).Sort("-a").Limit(1) // Sort by addedKey descending
+
+	iter, err := qry.Iter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query last change: %w", err)
+	}
+	defer iter.Close()
+
+	var lastModified time.Time
+	if iter.Next() {
+		doc, err := iter.Doc()
+		if err == nil {
+			timestamp := doc.Value().GetFloat64("a") // addedKey
+			lastModified = time.Unix(int64(timestamp), 0)
+		}
+	}
+
+	return &TreeInfo{
+		SpaceID:       spaceIDFromDir,
+		TreeID:        treeID,
+		ChangeCount:   totalCount,
+		RecentChanges: recentCount,
+		LastModified:  lastModified,
+		HasTimeFilter: hasTimeFilter,
+	}, nil
+}
+
+func processSpace(ctx context.Context, db anystore.DB, spaceIDFromDir string, afterTime time.Time, filterObjectID string) ([]TreeInfo, error) {
+	var results []TreeInfo
+
+	// Create space storage
+	spaceStorage, err := spacestorage.New(ctx, spaceIDFromDir, db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create space storage: %w", err)
+	}
+
+	// Get head storage
+	headStorage := spaceStorage.HeadStorage()
+
+	// If objectID is specified, query directly for that object instead of iterating all
+	if filterObjectID != "" {
+		treeInfo, err := processSpecificTree(ctx, db, spaceIDFromDir, filterObjectID, afterTime)
+		if err != nil {
+			// Object not found in this space is not an error, just return empty results
+			return results, nil
+		}
+		if treeInfo != nil {
+			results = append(results, *treeInfo)
+		}
+		return results, nil
+	}
+
+	// Iterate through all trees
+	err = headStorage.IterateEntries(ctx, headstorage.IterOpts{
+		Deleted: false, // Skip deleted trees
+	}, func(entry headstorage.HeadsEntry) (bool, error) {
+		treeID := entry.Id
+
+		// Open changes collection
+		changesColl, err := db.OpenCollection(ctx, objecttree.CollName)
+		if err != nil {
+			return false, fmt.Errorf("failed to open changes collection: %w", err)
+		}
+		defer changesColl.Close()
+
+		// Count total changes for this tree
+		totalCount, err := changesColl.Find(query.Key{
+			Path:   []string{objecttree.TreeKey},
+			Filter: query.NewComp(query.CompOpEq, treeID),
+		}).Count(ctx)
+		if err != nil {
+			return false, fmt.Errorf("failed to count total changes: %w", err)
+		}
+
+		// Count recent changes if time filter is active
+		var recentCount int
+		hasTimeFilter := !afterTime.IsZero()
+		if hasTimeFilter {
+			recentCount, err = changesColl.Find(query.And{
+				query.Key{Path: []string{objecttree.TreeKey}, Filter: query.NewComp(query.CompOpEq, treeID)},
+				query.Key{Path: []string{"a"}, Filter: query.NewComp(query.CompOpGte, float64(afterTime.Unix()))},
+			}).Count(ctx)
+			if err != nil {
+				return false, fmt.Errorf("failed to count recent changes: %w", err)
+			}
+
+			// Skip trees with no recent changes when time filter is active
+			if recentCount == 0 {
+				return true, nil
+			}
+		}
+
+		// Get last modified time
+		qry := changesColl.Find(query.Key{
+			Path:   []string{objecttree.TreeKey},
+			Filter: query.NewComp(query.CompOpEq, treeID),
+		}).Sort("-a").Limit(1) // Sort by addedKey descending
+
+		iter, err := qry.Iter(ctx)
+		if err != nil {
+			return false, fmt.Errorf("failed to query last change: %w", err)
+		}
+		defer iter.Close()
+
+		var lastModified time.Time
+		if iter.Next() {
+			doc, err := iter.Doc()
+			if err == nil {
+				timestamp := doc.Value().GetFloat64("a") // addedKey
+				lastModified = time.Unix(int64(timestamp), 0)
+			}
+		}
+
+		results = append(results, TreeInfo{
+			SpaceID:       spaceIDFromDir,
+			TreeID:        treeID,
+			ChangeCount:   totalCount,
+			RecentChanges: recentCount,
+			LastModified:  lastModified,
+			HasTimeFilter: hasTimeFilter,
+		})
+
+		return true, nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate trees: %w", err)
+	}
+
+	return results, nil
+}
+
+func truncateID(id string, maxLen int) string {
+	if len(id) <= maxLen {
+		return id
+	}
+	if maxLen <= 3 {
+		return id[:maxLen]
+	}
+	return id[:maxLen-3] + "..."
+}
+
+func formatTimestamp(t time.Time) string {
+	if t.IsZero() {
+		return "N/A"
+	}
+
+	// Show relative time for recent changes
+	duration := time.Since(t)
+	if duration < time.Hour {
+		return fmt.Sprintf("%dm ago", int(duration.Minutes()))
+	} else if duration < 24*time.Hour {
+		return fmt.Sprintf("%dh ago", int(duration.Hours()))
+	} else if duration < 7*24*time.Hour {
+		return fmt.Sprintf("%dd ago", int(duration.Hours()/24))
+	}
+
+	// For older changes, show the actual date
+	return t.Format("2006-01-02 15:04")
+}
