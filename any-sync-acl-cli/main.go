@@ -9,9 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anyproto/any-sync/accountservice"
 	"github.com/anyproto/any-sync/app"
 	"github.com/anyproto/any-sync/app/logger"
+	"github.com/anyproto/any-sync/commonspace/object/accountdata"
 	"github.com/anyproto/any-sync/commonspace/object/acl/aclrecordproto"
+	"github.com/anyproto/any-sync/commonspace/object/acl/list"
+	"github.com/anyproto/any-sync/commonspace/object/acl/recordverifier"
 	"github.com/anyproto/any-sync/consensus/consensusproto"
 	"github.com/anyproto/any-sync/coordinator/coordinatorclient"
 	"github.com/anyproto/any-sync/coordinator/nodeconfsource"
@@ -33,7 +37,7 @@ var (
 	fNetwork = flag.String("n", "", "path to network config yml file")
 	fHelp    = flag.Bool("h", false, "print this help")
 	fSpaceId = flag.String("s", "", "spaceId")
-	fLog     = flag.Bool("l", true, "show log")
+	fLog     = flag.Bool("l", false, "show log")
 )
 
 func main() {
@@ -71,14 +75,21 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	if err = cli.Summary(ctx, *fSpaceId); err != nil {
+		log.Fatal(err)
+	}
 }
 
 type AclCli struct {
 	coordinatorClient coordinatorclient.CoordinatorClient
+	account           *accountdata.AccountKeys
+	recordsBySpaceId  map[string][]*consensusproto.RawRecordWithId
 }
 
 func (a *AclCli) Init(ap *app.App) (err error) {
 	a.coordinatorClient = ap.MustComponent(coordinatorclient.CName).(coordinatorclient.CoordinatorClient)
+	a.account = ap.MustComponent(accountservice.CName).(accountservice.Service).Account()
+	a.recordsBySpaceId = make(map[string][]*consensusproto.RawRecordWithId)
 	return
 }
 
@@ -102,6 +113,64 @@ func (a *AclCli) Log(ctx context.Context, spaceId string) (err error) {
 			}
 		}
 	}
+	a.recordsBySpaceId[spaceId] = records
+	return
+}
+
+func (a *AclCli) Summary(ctx context.Context, spaceId string) (err error) {
+	records, ok := a.recordsBySpaceId[spaceId]
+	if !ok {
+		records, err = a.coordinatorClient.AclGetRecords(ctx, spaceId, "")
+		if err != nil {
+			return fmt.Errorf("failed to get acl records: %w", err)
+		}
+	}
+	store, err := list.NewInMemoryStorage(spaceId, records)
+	if err != nil {
+		return fmt.Errorf("failed to create acl storage: %w", err)
+	}
+	aclList, err := list.BuildAclListWithIdentity(a.account, store, recordverifier.NewValidateFull())
+	if err != nil {
+		return fmt.Errorf("failed to build acl list: %w", err)
+	}
+	state := aclList.AclState()
+	owner, err := state.OwnerPubKey()
+	if err != nil {
+		return fmt.Errorf("failed to get acl owner: %w", err)
+	}
+	fmt.Println("ACL state summary:")
+	fmt.Printf("\tOwner=%s\n", formatAccount(owner.Account()))
+
+	fmt.Println("\tInvites:")
+	for _, inv := range state.Invites() {
+		fmt.Printf("\t\tid=%v; type=%v\n", formatId(inv.Id), inv.Type.String())
+	}
+
+	fmt.Println("\tAccount statuses:")
+	var accByState [7]int
+	var accByRole [6]int
+	for _, acc := range state.CurrentAccounts() {
+		accByRole[acc.Permissions]++
+		accByState[acc.Status]++
+	}
+
+	var statusNames = [7]string{"none", "joining", "active", "removed", "declined", "removing", "canceled"}
+
+	for i, cnt := range accByState {
+		status := statusNames[i]
+		if cnt > 0 {
+			fmt.Printf("\t\t%v=%d\n", status, cnt)
+		}
+	}
+
+	fmt.Println("\tAccount roles:")
+	for i, cnt := range accByRole {
+		role := aclrecordproto.AclUserPermissions(i).String()
+		if cnt > 0 {
+			fmt.Printf("\t\t%v=%d\n", role, cnt)
+		}
+	}
+
 	return
 }
 
@@ -129,6 +198,9 @@ func printAclRoot(rec *consensusproto.RawRecordWithId) (err error) {
 	if aclRec.EncryptedReadKey != nil {
 		rootFlags = append(rootFlags, "readKey")
 	}
+	if aclRec.OneToOneInfo != nil {
+		rootFlags = append(rootFlags, "oneToOne")
+	}
 
 	fmt.Printf("%s\troot\t%s\t%s\t%s\n", formatId(rec.Id), formatIdentity(aclRec.Identity), acceptTime.Format(time.RFC3339), strings.Join(rootFlags, ","))
 	return
@@ -141,9 +213,13 @@ func formatIdentity(ident []byte) string {
 	}
 	if key != nil {
 		accId := key.Account()
-		return accId[:4] + ".." + accId[len(accId)-4:]
+		return formatAccount(accId)
 	}
 	return "invalid"
+}
+
+func formatAccount(accountId string) string {
+	return accountId[:4] + ".." + accountId[len(accountId)-4:]
 }
 
 func printAclRecord(rec *consensusproto.RawRecordWithId) (err error) {
