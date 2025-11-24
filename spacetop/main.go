@@ -12,6 +12,7 @@ var (
 	topN     int
 	since    string
 	spaceID  string
+	objectID string
 )
 
 var rootCmd = &cobra.Command{
@@ -30,6 +31,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&topN, "top", "n", 20, "Number of top trees to show")
 	rootCmd.Flags().StringVarP(&since, "since", "s", "", "Filter by last change time (e.g., 10m, 1h, 24h)")
 	rootCmd.Flags().StringVar(&spaceID, "space-id", "", "Filter by specific space ID")
+	rootCmd.Flags().StringVar(&objectID, "object-id", "", "Filter by specific object ID (searches all spaces unless --space-id is also specified)")
 
 	rootCmd.MarkFlagRequired("path")
 }

@@ -44,7 +44,7 @@ func runAnalyzer() error {
 	}
 
 	// Analyze all spaces
-	trees, err := analyzeSpaces(ctx, rootPath, afterTime, spaceID)
+	trees, err := analyzeSpaces(ctx, rootPath, afterTime, spaceID, objectID)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func runAnalyzer() error {
 	return runInteractiveUI(ctx, trees, rootPath)
 }
 
-func analyzeSpaces(ctx context.Context, rootPath string, afterTime time.Time, filterSpaceID string) ([]TreeInfo, error) {
+func analyzeSpaces(ctx context.Context, rootPath string, afterTime time.Time, filterSpaceID string, filterObjectID string) ([]TreeInfo, error) {
 	var results []TreeInfo
 
 	// Read all directories in the root path
@@ -114,7 +114,7 @@ func analyzeSpaces(ctx context.Context, rootPath string, afterTime time.Time, fi
 		}
 
 		// Process the space
-		spaceResults, err := processSpace(ctx, db, spaceIDFromDir, afterTime)
+		spaceResults, err := processSpace(ctx, db, spaceIDFromDir, afterTime, filterObjectID)
 		db.Close()
 
 		if err != nil {
@@ -126,6 +126,11 @@ func analyzeSpaces(ctx context.Context, rootPath string, afterTime time.Time, fi
 		results = append(results, spaceResults...)
 		spacesProcessed++
 		fmt.Printf("Processed space: %s (found %d trees)\n", spaceIDFromDir, len(spaceResults))
+
+		// If we found the specific object, we can stop searching
+		if filterObjectID != "" && len(spaceResults) > 0 {
+			break
+		}
 	}
 
 	fmt.Println(strings.Repeat("-", 80))
@@ -134,7 +139,78 @@ func analyzeSpaces(ctx context.Context, rootPath string, afterTime time.Time, fi
 	return results, nil
 }
 
-func processSpace(ctx context.Context, db anystore.DB, spaceIDFromDir string, afterTime time.Time) ([]TreeInfo, error) {
+func processSpecificTree(ctx context.Context, db anystore.DB, spaceIDFromDir string, treeID string, afterTime time.Time) (*TreeInfo, error) {
+	// Open changes collection
+	changesColl, err := db.OpenCollection(ctx, objecttree.CollName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open changes collection: %w", err)
+	}
+	defer changesColl.Close()
+
+	// Check if this tree exists and count total changes
+	totalCount, err := changesColl.Find(query.Key{
+		Path:   []string{objecttree.TreeKey},
+		Filter: query.NewComp(query.CompOpEq, treeID),
+	}).Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count total changes: %w", err)
+	}
+
+	// If no changes found, the object doesn't exist in this space
+	if totalCount == 0 {
+		return nil, nil
+	}
+
+	// Count recent changes if time filter is active
+	var recentCount int
+	hasTimeFilter := !afterTime.IsZero()
+	if hasTimeFilter {
+		recentCount, err = changesColl.Find(query.And{
+			query.Key{Path: []string{objecttree.TreeKey}, Filter: query.NewComp(query.CompOpEq, treeID)},
+			query.Key{Path: []string{"a"}, Filter: query.NewComp(query.CompOpGte, float64(afterTime.Unix()))},
+		}).Count(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to count recent changes: %w", err)
+		}
+
+		// Skip this tree if no recent changes when time filter is active
+		if recentCount == 0 {
+			return nil, nil
+		}
+	}
+
+	// Get last modified time
+	qry := changesColl.Find(query.Key{
+		Path:   []string{objecttree.TreeKey},
+		Filter: query.NewComp(query.CompOpEq, treeID),
+	}).Sort("-a").Limit(1) // Sort by addedKey descending
+
+	iter, err := qry.Iter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query last change: %w", err)
+	}
+	defer iter.Close()
+
+	var lastModified time.Time
+	if iter.Next() {
+		doc, err := iter.Doc()
+		if err == nil {
+			timestamp := doc.Value().GetFloat64("a") // addedKey
+			lastModified = time.Unix(int64(timestamp), 0)
+		}
+	}
+
+	return &TreeInfo{
+		SpaceID:       spaceIDFromDir,
+		TreeID:        treeID,
+		ChangeCount:   totalCount,
+		RecentChanges: recentCount,
+		LastModified:  lastModified,
+		HasTimeFilter: hasTimeFilter,
+	}, nil
+}
+
+func processSpace(ctx context.Context, db anystore.DB, spaceIDFromDir string, afterTime time.Time, filterObjectID string) ([]TreeInfo, error) {
 	var results []TreeInfo
 
 	// Create space storage
@@ -145,6 +221,19 @@ func processSpace(ctx context.Context, db anystore.DB, spaceIDFromDir string, af
 
 	// Get head storage
 	headStorage := spaceStorage.HeadStorage()
+
+	// If objectID is specified, query directly for that object instead of iterating all
+	if filterObjectID != "" {
+		treeInfo, err := processSpecificTree(ctx, db, spaceIDFromDir, filterObjectID, afterTime)
+		if err != nil {
+			// Object not found in this space is not an error, just return empty results
+			return results, nil
+		}
+		if treeInfo != nil {
+			results = append(results, *treeInfo)
+		}
+		return results, nil
+	}
 
 	// Iterate through all trees
 	err = headStorage.IterateEntries(ctx, headstorage.IterOpts{
