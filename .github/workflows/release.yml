@@ -13,4 +13,5 @@ jobs:
     secrets: inherit # pass all secrets
     with:
       matrix-os: '["linux", "windows","darwin"]'
+      build-run-unit-tests: false
       build-cmd: cp ./any-sync-network/defaultTemplate.yml ./bin/
