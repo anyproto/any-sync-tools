@@ -87,4 +87,3 @@ require (
 	modernc.org/sqlite v1.37.1 // indirect
 )
 
-replace github.com/anyproto/any-sync => ../any-sync
