@@ -9,7 +9,7 @@ permissions: write-all
 
 jobs:
   release-reusable:
-    uses: anyproto/shared-actions/.github/workflows/release-go-daemons-reusable.yml@OPS-860
+    uses: anyproto/shared-actions/.github/workflows/release-go-daemons-reusable.yml@v1
     secrets: inherit # pass all secrets
     with:
       matrix-os: '["linux", "windows","darwin"]'
