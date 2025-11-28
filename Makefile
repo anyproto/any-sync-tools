@@ -20,6 +20,8 @@ endif
 build:
 	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -v $(TAGS) -o bin/any-sync-network$(BIN_SUFFUX) ./any-sync-network
 	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -v $(TAGS) -o bin/any-sync-netcheck$(BIN_SUFFUX) ./any-sync-netcheck
+	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -v $(TAGS) -o bin/any-sync-acl-cli$(BIN_SUFFUX) ./any-sync-acl-cli
+	GOOS=$(BUILD_GOOS) GOARCH=$(BUILD_GOARCH) go build -v $(TAGS) -o bin/anyconf$(BIN_SUFFUX) ./anyconf
 
 deps:
 	go mod download
