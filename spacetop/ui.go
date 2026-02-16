@@ -274,6 +274,7 @@ func buildColumns(trees []TreeInfo) []table.Column {
 			{Title: "Rank", Width: 6},
 			{Title: "Space ID", Width: 74},
 			{Title: "Tree ID", Width: 59},
+			{Title: "SBType", Width: 8},
 			{Title: "Total", Width: 10},
 			{Title: "Recent", Width: 10},
 			{Title: "Last Modified", Width: 15},
@@ -284,6 +285,7 @@ func buildColumns(trees []TreeInfo) []table.Column {
 		{Title: "Rank", Width: 6},
 		{Title: "Space ID", Width: 74},
 		{Title: "Tree ID", Width: 59},
+		{Title: "SBType", Width: 8},
 		{Title: "Changes", Width: 10},
 		{Title: "Last Modified", Width: 15},
 	}
@@ -301,6 +303,7 @@ func treesToRows(trees []TreeInfo) []table.Row {
 				rank,
 				tree.SpaceID,
 				tree.TreeID,
+				tree.SmartBlockType,
 				fmt.Sprintf("%d", tree.ChangeCount),
 				fmt.Sprintf("%d", tree.RecentChanges),
 				lastMod,
@@ -310,6 +313,7 @@ func treesToRows(trees []TreeInfo) []table.Row {
 				rank,
 				tree.SpaceID,
 				tree.TreeID,
+				tree.SmartBlockType,
 				fmt.Sprintf("%d", tree.ChangeCount),
 				lastMod,
 			}

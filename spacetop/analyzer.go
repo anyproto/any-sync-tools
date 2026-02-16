@@ -13,12 +13,15 @@ import (
 	"github.com/anyproto/any-store/query"
 	"github.com/anyproto/any-sync/commonspace/headsync/headstorage"
 	"github.com/anyproto/any-sync/commonspace/object/tree/objecttree"
+	"github.com/anyproto/any-sync/commonspace/object/tree/treechangeproto"
 	"github.com/anyproto/any-sync/commonspace/spacestorage"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 type TreeInfo struct {
 	SpaceID        string
 	TreeID         string
+	SmartBlockType string
 	ChangeCount    int
 	RecentChanges  int // Changes within time filter (if --since provided)
 	LastModified   time.Time
@@ -48,6 +51,9 @@ func runAnalyzer() error {
 	if err != nil {
 		return err
 	}
+
+	// Enrich with smartblockType from objectstore
+	enrichWithSmartBlockType(ctx, trees, rootPath)
 
 	// Sort by change count (descending)
 	// If time filter is active, sort by recent changes; otherwise by total changes
@@ -313,6 +319,138 @@ func processSpace(ctx context.Context, db anystore.DB, spaceIDFromDir string, af
 	}
 
 	return results, nil
+}
+
+// smartBlockTypeNames maps protobuf enum values to human-readable names.
+var smartBlockTypeNames = map[int]string{
+	0:   "AccountOld",
+	16:  "Page",
+	17:  "ProfilePage",
+	32:  "Home",
+	48:  "Archive",
+	112: "Widget",
+	256: "File",
+	288: "Template",
+	289: "BundledTpl",
+	512: "BundledRel",
+	513: "SubObject",
+	514: "BundledOT",
+	515: "Profile",
+	516: "Date",
+	518: "Workspace",
+	519: "Missing",
+	521: "Relation",
+	528: "Type",
+	529: "RelOption",
+	530: "SpaceView",
+	532: "Identity",
+	533: "FileObj",
+	534: "Participant",
+	535: "Notif",
+	536: "Devices",
+	537: "Chat",
+	544: "ChatDerived",
+	545: "Account",
+}
+
+func enrichWithSmartBlockType(ctx context.Context, trees []TreeInfo, rootPath string) {
+	// Group trees by space
+	bySpace := make(map[string][]int)
+	for i := range trees {
+		bySpace[trees[i].SpaceID] = append(bySpace[trees[i].SpaceID], i)
+	}
+
+	for spaceID, indices := range bySpace {
+		dbPath := filepath.Join(rootPath, spaceID, "store.db")
+		db, err := anystore.Open(ctx, dbPath, &anystore.Config{
+			SQLiteConnectionOptions: map[string]string{"synchronous": "off"},
+		})
+		if err != nil {
+			continue
+		}
+
+		coll, err := db.OpenCollection(ctx, objecttree.CollName)
+		if err != nil {
+			db.Close()
+			continue
+		}
+
+		for _, idx := range indices {
+			sbt := resolveSmartBlockType(ctx, coll, trees[idx].TreeID)
+			if sbt != "" {
+				trees[idx].SmartBlockType = sbt
+			}
+		}
+
+		coll.Close()
+		db.Close()
+	}
+}
+
+// resolveSmartBlockType reads the root change for a tree and extracts the smartblock type
+// from the protobuf chain: RawTreeChange → RootChange → ChangePayload (ObjectChangePayload field 1).
+func resolveSmartBlockType(ctx context.Context, coll anystore.Collection, treeID string) string {
+	doc, err := coll.FindId(ctx, treeID)
+	if err != nil {
+		return ""
+	}
+
+	rawBytes := doc.Value().GetBytes("r")
+	if len(rawBytes) == 0 {
+		return ""
+	}
+
+	// Unmarshal RawTreeChange to get Payload
+	raw := &treechangeproto.RawTreeChange{}
+	if err := raw.UnmarshalVT(rawBytes); err != nil {
+		return ""
+	}
+
+	// Unmarshal RootChange to get ChangeType and ChangePayload
+	root := &treechangeproto.RootChange{}
+	if err := root.UnmarshalVT(raw.Payload); err != nil {
+		return ""
+	}
+
+	if root.ChangeType != "anytype.object" {
+		return root.ChangeType
+	}
+
+	// Parse ObjectChangePayload field 1 (SmartBlockType varint) manually
+	// to avoid importing anytype-heart
+	sbt := parseSmartBlockTypeFromPayload(root.ChangePayload)
+	if name, ok := smartBlockTypeNames[sbt]; ok {
+		return name
+	}
+	if sbt != 0 {
+		return fmt.Sprintf("%d", sbt)
+	}
+	return ""
+}
+
+// parseSmartBlockTypeFromPayload extracts field 1 (varint) from the ObjectChangePayload protobuf.
+func parseSmartBlockTypeFromPayload(b []byte) int {
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			return 0
+		}
+		b = b[n:]
+		if num == 1 && typ == protowire.VarintType {
+			v, vn := protowire.ConsumeVarint(b)
+			if vn < 0 {
+				return 0
+			}
+			return int(v)
+		}
+		// Skip this field
+		n = protowire.ConsumeFieldValue(num, typ, b)
+		if n < 0 {
+			return 0
+		}
+		b = b[n:]
+	}
+	return 0
 }
 
 func truncateID(id string, maxLen int) string {
