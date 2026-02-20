@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SLIP-0010 Wallet</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0e0e10;color:#e0e0e0;min-height:100vh;padding:2rem}
+h1{font-size:1.4rem;font-weight:600;margin-bottom:1.5rem;color:#fff}
+h2{font-size:1rem;font-weight:600;margin-bottom:1rem;color:#a0a0b0;text-transform:uppercase;letter-spacing:.08em}
+section{background:#18181b;border:1px solid #27272a;border-radius:12px;padding:1.5rem;margin-bottom:1.25rem;max-width:640px}
+label{display:block;font-size:.8rem;color:#71717a;margin-bottom:.35rem;font-weight:500}
+input,textarea{width:100%;background:#09090b;border:1px solid #27272a;border-radius:8px;padding:.6rem .75rem;color:#e0e0e0;font-family:ui-monospace,monospace;font-size:.85rem;outline:none;transition:border .15s}
+input:focus,textarea:focus{border-color:#3b82f6}
+textarea{resize:vertical;min-height:3.2rem}
+.row{margin-bottom:.85rem}
+button{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:.55rem 1.2rem;font-size:.85rem;font-weight:600;cursor:pointer;transition:background .15s}
+button:hover{background:#2563eb}
+button:disabled{opacity:.4;cursor:not-allowed}
+.out{background:#09090b;border:1px solid #27272a;border-radius:8px;padding:.6rem .75rem;font-family:ui-monospace,monospace;font-size:.8rem;word-break:break-all;min-height:2.2rem;color:#a1a1aa;line-height:1.5}
+.out.ok{color:#22c55e;border-color:#166534}
+.out.err{color:#ef4444;border-color:#7f1d1d}
+.muted{font-size:.75rem;color:#52525b;margin-top:.35rem}
+.cols{display:flex;gap:.75rem;align-items:flex-end}
+.cols>*{flex:1}
+.cols>button{flex:none}
+.badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.75rem;font-weight:600}
+.badge.valid{background:#052e16;color:#22c55e}
+.badge.invalid{background:#450a0a;color:#ef4444}
+#toggle-mn{background:none;border:1px solid #27272a;color:#71717a;padding:.35rem .7rem;font-size:.75rem;border-radius:6px;margin-left:.5rem}
+</style>
+</head>
+<body>
+
+<h1>SLIP-0010 Ed25519 Wallet</h1>
+
+<!-- ─── Mnemonic ─────────────────────────────────── -->
+<section>
+  <h2>Mnemonic</h2>
+  <div class="row">
+    <label>BIP-39 Mnemonic <button id="toggle-mn" type="button">show</button></label>
+    <input id="mnemonic" type="password" placeholder="Enter 12 / 24 words or generate one…" spellcheck="false" autocomplete="off">
+    <div class="muted" id="mn-status"></div>
+  </div>
+  <div class="cols">
+    <button id="btn-gen">Generate New</button>
+    <button id="btn-derive" disabled>Derive Account</button>
+  </div>
+</section>
+
+<!-- ─── Account ──────────────────────────────────── -->
+<section id="sec-account" style="display:none">
+  <h2>Account <span class="muted" style="text-transform:none;letter-spacing:0">(m/44'/2046'/0'/0')</span></h2>
+  <div class="row">
+    <label>Address</label>
+    <div class="out" id="out-addr"></div>
+  </div>
+  <div class="row">
+    <label>Public Key (hex)</label>
+    <div class="out" id="out-pub"></div>
+  </div>
+</section>
+
+<!-- ─── Sign ─────────────────────────────────────── -->
+<section id="sec-sign" style="display:none">
+  <h2>Sign</h2>
+  <div class="row">
+    <label>Message</label>
+    <textarea id="sign-msg" rows="2" placeholder="Type a message to sign…"></textarea>
+  </div>
+  <button id="btn-sign">Sign Message</button>
+  <div class="row" style="margin-top:.85rem">
+    <label>Signature (hex)</label>
+    <div class="out" id="out-sig"></div>
+  </div>
+</section>
+
+<!-- ─── Verify ───────────────────────────────────── -->
+<section>
+  <h2>Verify</h2>
+  <div class="row">
+    <label>Message</label>
+    <textarea id="ver-msg" rows="2" placeholder="Message that was signed…"></textarea>
+  </div>
+  <div class="row">
+    <label>Signature (hex, 128 chars)</label>
+    <input id="ver-sig" placeholder="Paste signature hex…" spellcheck="false">
+  </div>
+  <div class="row">
+    <label>Account Address (A…)</label>
+    <input id="ver-pub" placeholder="Paste account address…" spellcheck="false">
+  </div>
+  <div class="cols">
+    <button id="btn-verify">Verify</button>
+  </div>
+  <div class="row" style="margin-top:.85rem">
+    <div class="out" id="out-verify"></div>
+  </div>
+</section>
+
+<script src="slip10.compiled.js"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+
+  let currentNode = null;
+  let currentAddr = null;
+
+  // ── Toggle mnemonic visibility ──
+  $('toggle-mn').onclick = function () {
+    const inp = $('mnemonic');
+    const hidden = inp.type === 'password';
+    inp.type = hidden ? 'text' : 'password';
+    this.textContent = hidden ? 'hide' : 'show';
+  };
+
+  // ── Validate mnemonic on input ──
+  $('mnemonic').addEventListener('input', async function () {
+    const val = this.value.trim();
+    const status = $('mn-status');
+    const btn = $('btn-derive');
+    if (!val) { status.textContent = ''; btn.disabled = true; return; }
+    const valid = await slip10.validateMnemonic(val);
+    status.textContent = valid ? 'Valid mnemonic' : 'Invalid mnemonic';
+    status.style.color = valid ? '#22c55e' : '#ef4444';
+    btn.disabled = !valid;
+  });
+
+  // ── Generate mnemonic ──
+  $('btn-gen').onclick = async function () {
+    const mn = await slip10.generateMnemonic(128);
+    $('mnemonic').value = mn;
+    $('mnemonic').dispatchEvent(new Event('input'));
+  };
+
+  // ── Derive account ──
+  $('btn-derive').onclick = async function () {
+    this.disabled = true;
+    this.textContent = 'Deriving…';
+    try {
+      const mn = $('mnemonic').value.trim();
+      const seed = await slip10.mnemonicToSeed(mn);
+      currentNode = await slip10.deriveAccount(seed);
+      const kp = await currentNode.keypair();
+      currentAddr = await currentNode.account();
+
+      $('out-addr').textContent = currentAddr;
+      $('out-pub').textContent  = slip10.bytesToHex(kp.publicKey);
+      $('sec-account').style.display = '';
+      $('sec-sign').style.display    = '';
+
+      // Pre-fill verify account address for convenience
+      $('ver-pub').value = currentAddr;
+    } catch (e) {
+      $('out-addr').textContent = 'Error: ' + e.message;
+      $('out-addr').className = 'out err';
+    }
+    this.disabled = false;
+    this.textContent = 'Derive Account';
+  };
+
+  // ── Sign ──
+  $('btn-sign').onclick = async function () {
+    if (!currentNode) return;
+    const msg = $('sign-msg').value;
+    if (!msg) return;
+    this.disabled = true;
+    this.textContent = 'Signing…';
+    try {
+      const sig = await currentNode.sign(msg);
+      const hex = slip10.bytesToHex(sig);
+      $('out-sig').textContent = hex;
+      $('out-sig').className   = 'out';
+      // Auto-fill verify fields
+      $('ver-msg').value = msg;
+      $('ver-sig').value = hex;
+      $('ver-pub').value = currentAddr;
+    } catch (e) {
+      $('out-sig').textContent = 'Error: ' + e.message;
+      $('out-sig').className   = 'out err';
+    }
+    this.disabled = false;
+    this.textContent = 'Sign Message';
+  };
+
+  // ── Verify ──
+  $('btn-verify').onclick = async function () {
+    const outEl = $('out-verify');
+    const msg = $('ver-msg').value;
+    const sigHex = $('ver-sig').value.trim();
+    const addr = $('ver-pub').value.trim();
+    if (!msg || !sigHex || !addr) {
+      outEl.textContent = 'Fill in all fields';
+      outEl.className = 'out err';
+      return;
+    }
+    if (sigHex.length !== 128 || !/^[0-9a-fA-F]+$/.test(sigHex)) {
+      outEl.textContent = 'Signature must be 128 hex characters (64 bytes)';
+      outEl.className = 'out err';
+      return;
+    }
+    this.disabled = true;
+    this.textContent = 'Verifying…';
+    try {
+      const pub = slip10.decodeAccount(addr);
+      const sig = slip10.hexToBytes(sigHex);
+      const ok = await slip10.verify(msg, sig, pub);
+      outEl.textContent = ok ? 'Signature is valid' : 'Signature is INVALID';
+      outEl.className   = ok ? 'out ok' : 'out err';
+    } catch (e) {
+      outEl.textContent = 'Error: ' + e.message;
+      outEl.className   = 'out err';
+    }
+    this.disabled = false;
+    this.textContent = 'Verify';
+  };
+})();
+</script>
+</body>
+</html>

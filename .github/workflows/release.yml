@@ -15,3 +15,26 @@ jobs:
       matrix-os: '["linux", "windows","darwin"]'
       build-run-unit-tests: false
       build-cmd: cp ./any-sync-network/defaultTemplate.yml ./bin/
+
+  crypto-js:
+    name: Build crypto.compiled.html
+    needs: release-reusable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build
+        working-directory: crypto-js
+        run: |
+          node build.js
+          node bundle.js
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: crypto-js/crypto.compiled.html
+          token: ${{ secrets.ANYTYPE_PAT }}
