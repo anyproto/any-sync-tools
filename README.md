@@ -11,6 +11,38 @@ Network issues debugger for Any-Sync networks.
 See the tool [`README`](any-sync-netcheck/README.md) for more details.
 
 
+## `any-sync-acl-cli`
+
+ACL (Access Control List) inspector for Any-Sync spaces.
+Connects to a coordinator node and prints the ACL log and state summary for a given space.
+
+**Usage:**
+
+```
+any-sync-acl-cli -n <network-config.yml> -s <spaceId> [-l]
+```
+
+Flags:
+- `-n` — path to network config YAML file
+- `-s` — space ID to inspect
+- `-l` — also print the full ACL record log (optional)
+
+## `any-sync-signing`
+
+CLI tool for deriving an Anytype Ed25519 identity from a BIP39 mnemonic (via SLIP-0010) and signing arbitrary data.
+
+**Usage:**
+
+```
+# Derive identity and sign messages interactively
+any-sync-signing [--index <n>] [--show-private]
+
+# Verify a signature
+any-sync-signing verify
+```
+
+The sign command prompts for a BIP39 mnemonic (hidden input), displays the derived account/peer IDs, then enters an interactive loop where you can type messages to sign. The verify command prompts for an account address, message, and base58 signature, then confirms validity.
+
 ## Contribution
 Thank you for your desire to develop Anytype together!
 
