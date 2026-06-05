@@ -57,6 +57,7 @@ var (
 	verbose   = flag.Bool("v", false, "verbose logs")
 	addrs     = flag.String("addrs", defaultAddrs, "comma separated list of addrs")
 	clientYml = flag.String("c", "", "path to client.yml file")
+	nodeId    = flag.String("node", "", "peerId of a specific node from client.yml to probe (requires -c)")
 )
 
 func main() {
@@ -65,6 +66,10 @@ func main() {
 	logger.SetNamedLevels(logger.LevelsFromStr("*=INFO"))
 	if *verbose {
 		logger.SetNamedLevels(logger.LevelsFromStr("*=DEBUG"))
+	}
+
+	if *nodeId != "" && *clientYml == "" {
+		log.Fatal("the -node flag requires -c <client.yml>")
 	}
 
 	var checkAddrs []string
@@ -79,14 +84,33 @@ func main() {
 			log.Fatal("cannot unmarshal client.yml", zap.Error(err))
 		}
 
-		for _, node := range configFile.Nodes {
-			for _, t := range node.Types {
-				if t == "coordinator" {
-					for _, address := range node.Addresses {
-						if !strings.HasPrefix(address, "quic://") {
-							address = "yamux://" + address
+		if *nodeId != "" {
+			var (
+				found        bool
+				availableIds []string
+			)
+			for _, node := range configFile.Nodes {
+				availableIds = append(availableIds, node.PeerId)
+				if node.PeerId != *nodeId {
+					continue
+				}
+				found = true
+				for _, address := range node.Addresses {
+					checkAddrs = append(checkAddrs, normalizeAddr(address))
+				}
+			}
+			if !found {
+				log.Fatal("node not found in client.yml",
+					zap.String("node", *nodeId),
+					zap.Strings("availableNodes", availableIds))
+			}
+		} else {
+			for _, node := range configFile.Nodes {
+				for _, t := range node.Types {
+					if t == "coordinator" {
+						for _, address := range node.Addresses {
+							checkAddrs = append(checkAddrs, normalizeAddr(address))
 						}
-						checkAddrs = append(checkAddrs, address)
 					}
 				}
 			}
@@ -121,6 +145,15 @@ func main() {
 	}
 }
 
+
+// normalizeAddr prepends the yamux:// scheme to addresses that don't already
+// carry an explicit scheme, matching the schemes understood by the prober.
+func normalizeAddr(address string) string {
+	if !strings.HasPrefix(address, "quic://") {
+		address = "yamux://" + address
+	}
+	return address
+}
 
 func probeYamux(a *app.App, addr string) {
 	ss := a.MustComponent(secureservice.CName).(secureservice.SecureService)

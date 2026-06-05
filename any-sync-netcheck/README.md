@@ -18,6 +18,8 @@ You can download the binary release here: https://github.com/anyproto/any-sync-t
 
 ```any-sync-netcheck -c <path_to_client.yml>``` read and check coordinators from the client.yml file
 
+```any-sync-netcheck -c <path_to_client.yml> -node <peerId>``` check a specific node (of any type) by its peerId, using the addresses listed for it in the client.yml file
+
 ## Contribution
 Thank you for your desire to develop Anytype together!
 
