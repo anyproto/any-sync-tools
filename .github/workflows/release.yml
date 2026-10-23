@@ -9,8 +9,8 @@ permissions: write-all
 
 jobs:
   release-reusable:
-    uses: anyproto/shared-actions/.github/workflows/release-go-daemons-reusable.yml@main
-    secrets: inherit # pass all secrets
+    uses: anyproto/shared-actions/.github/workflows/release-go-daemons-reusable.yml@v1
+    secrets: inherit
     with:
       matrix-os: '["linux", "windows","darwin"]'
       build-run-unit-tests: false
@@ -21,9 +21,9 @@ jobs:
     needs: release-reusable
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -34,7 +34,7 @@ jobs:
           node bundle.js
 
       - name: Upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: crypto-js/crypto.compiled.html
           token: ${{ secrets.ANYTYPE_PAT }}
